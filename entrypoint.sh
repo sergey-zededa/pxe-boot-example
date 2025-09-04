@@ -52,8 +52,8 @@ for version in $EVE_VERSIONS; do
         
         echo "Extracting assets for version ${version}..."
         mkdir -p "/data/httpboot/${version}"
-        tar -xvf "/data/downloads/netboot-${version}.tar" -C "/data/httpboot/${version}"
-        rm "/data/downloads/netboot-${version}.tar"
+tar -xvf "/data/downloads/netboot-${version}.tar" -C "/data/httpboot/${version}"
+rm "/data/downloads/netboot-${version}.tar"
     else
         echo "Version ${version} found in cache. Skipping download."
     fi
@@ -77,7 +77,6 @@ echo "interface=${LISTEN_INTERFACE}" >> /etc/dnsmasq.conf
 echo "enable-tftp" >> /etc/dnsmasq.conf
 echo "tftp-root=/tftpboot" >> /etc/dnsmasq.conf
 echo "dhcp-boot=boot.ipxe,,${SERVER_IP}" >> /etc/dnsmasq.conf
-echo "pxe-service=0, \"UEFI PXE Boot\", ipxe.efi" >> /etc/dnsmasq.conf
 echo "pxe-service=x86PC,\"PXE Network Boot\",boot.ipxe,,${SERVER_IP}" >> /etc/dnsmasq.conf
 
 if [ "$DHCP_MODE" = "standalone" ]; then
@@ -144,7 +143,8 @@ item shell Drop to iPXE shell
 item reboot Reboot computer
 
 choose --timeout ${BOOT_MENU_TIMEOUT}000 --default eve_1 selected
-goto ${selected} 
+goto ${selected}
+
 EOF
 
 item_num=1
