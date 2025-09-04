@@ -81,12 +81,14 @@ echo "dhcp-match=efi,option:client-arch,7" >> /etc/dnsmasq.conf
 # Legacy BIOS clients get your text menu
 echo "dhcp-boot=undionly.kpxe,pxeserver,${SERVER_IP}" >> /etc/dnsmasq.conf
 # UEFI clients get the EFI loader
+echo "dhcp-match=set:ipxe,175" >> /etc/dnsmasq.conf
+echo "dhcp-vendorclass=BIOS,PXEClient:Arch:00000" >> /etc/dnsmasq.conf
 echo "dhcp-boot=tag:efi,ipxe.efi,,${SERVER_IP}" >> /etc/dnsmasq.conf
 # After the NBP (undionly.kpxe or ipxe.efi) runs, it will fetch boot.ipxe over HTTP
 echo "pxe-service=x86PC,\"PXE Network Boot\",boot.ipxe,,${SERVER_IP}" >> /etc/dnsmasq.conf
 echo "tftp-no-blocksize" >> /etc/dnsmasq.conf
 # For iPXE (user class)
-echo "dhcp-option=tag:ipxe,script-url,http://${SERVER_IP}/boot.ipxe" >> /etc/dnsmasq.conf
+echo "dhcp-option=tag:ipxe,175,http://${SERVER_IP}/boot.ipxe" >> /etc/dnsmasq.conf
 
 if [ "$DHCP_MODE" = "standalone" ]; then
     echo "Configuring standalone DHCP mode..."
@@ -114,8 +116,6 @@ elif [ "$DHCP_MODE" = "proxy" ]; then
     if [ -n "$DHCP_BROADCAST_ADDRESS" ]; then
         echo "dhcp-option=28,${DHCP_BROADCAST_ADDRESS}" >> /etc/dnsmasq.conf
     fi
-    echo "dhcp-match=set:ipxe,175" >> /etc/dnsmasq.conf
-    echo "dhcp-vendorclass=BIOS,PXEClient:Arch:00000" >> /etc/dnsmasq.conf
 else
     echo "Error: Invalid DHCP_MODE specified. Must be 'proxy' or 'standalone'."
     exit 1
