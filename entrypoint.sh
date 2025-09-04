@@ -123,6 +123,7 @@ echo "Generating iPXE boot menu..."
 cat > /tftpboot/boot.ipxe <<- EOF
 #!ipxe
 
+:start
 menu EVE-OS Version Selection
 
 EOF
