@@ -1,0 +1,30 @@
+#!ipxe
+
+menu EVE-OS Version Selection
+
+item eve_1 Install EVE-OS 14.5.1-lts
+item eve_2 Install EVE-OS 14.5.0-lts
+
+item --gap -- ------------------------------------------
+item shell Drop to iPXE shell
+item reboot Reboot computer
+
+choose --timeout 20000 --default eve_1 selected
+goto  
+:eve_1
+chain http://192.168.0.4/14.5.1-lts/ipxe.efi.cfg || goto failed
+:eve_2
+chain http://192.168.0.4/14.5.0-lts/ipxe.efi.cfg || goto failed
+
+:shell
+shell
+goto start
+
+:reboot
+reboot
+
+:failed
+echo Boot failed, returning to menu in 5 seconds...
+sleep 5
+goto start
+

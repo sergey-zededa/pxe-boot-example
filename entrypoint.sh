@@ -77,6 +77,7 @@ echo "interface=${LISTEN_INTERFACE}" >> /etc/dnsmasq.conf
 echo "enable-tftp" >> /etc/dnsmasq.conf
 echo "tftp-root=/tftpboot" >> /etc/dnsmasq.conf
 echo "dhcp-boot=boot.ipxe,,${SERVER_IP}" >> /etc/dnsmasq.conf
+echo "pxe-service=0, \"UEFI PXE Boot\", ipxe.efi" >> /etc/dnsmasq.conf
 echo "pxe-service=x86PC,\"PXE Network Boot\",boot.ipxe,,${SERVER_IP}" >> /etc/dnsmasq.conf
 
 if [ "$DHCP_MODE" = "standalone" ]; then
