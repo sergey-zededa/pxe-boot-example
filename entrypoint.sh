@@ -64,9 +64,10 @@ for version in $EVE_VERSIONS; do
         cp "/data/httpboot/${DEFAULT_VERSION}/ipxe.efi" /tftpboot/ipxe.efi
     fi
 
-    echo "set url http://${SERVER_IP}/${version}" >> /tftpboot/${version}/ipxe.efi.cfg
-    cat /data/httpboot/${version}/ipxe.efi.cfg >> /tftpboot/${version}/ipxe.efi.cfg
-
+    cp /data/httpboot/${version}/ipxe.efi.cfg /data/httpboot/${version}/ipxe.efi.cfg.tmp
+    echo "set url http://${SERVER_IP}/${version}" >> /httpboot/${version}/ipxe.efi.cfg
+    cat /data/httpboot/${version}/ipxe.efi.cfg.tmp >> /httpboot/${version}/ipxe.efi.cfg
+    rm /data/httpboot/${version}/ipxe.efi.cfg.tmp
 done
 IFS=$OLD_IFS
 echo "---"
