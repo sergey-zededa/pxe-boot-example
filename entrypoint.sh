@@ -54,6 +54,10 @@ for version in $EVE_VERSIONS; do
         mkdir -p "/data/httpboot/${version}"
         tar -xvf "/data/downloads/netboot-${version}.tar" -C "/data/httpboot/${version}"
         rm "/data/downloads/netboot-${version}.tar"
+        cp "/data/httpboot/${version}/ipxe.efi.cfg" "/data/httpboot/${version}/ipxe.efi.cfg.tmp"
+        echo "set url http://${SERVER_IP}/${version}" >> "/httpboot/${version}/ipxe.efi.cfg"
+        cat "/data/httpboot/${version}/ipxe.efi.cfg.tmp" >> "/httpboot/${version}/ipxe.efi.cfg"
+        rm "/data/httpboot/${version}/ipxe.efi.cfg.tmp"
     else
         echo "Version ${version} found in cache. Skipping download."
     fi
@@ -64,10 +68,6 @@ for version in $EVE_VERSIONS; do
         cp "/data/httpboot/${DEFAULT_VERSION}/ipxe.efi" /tftpboot/ipxe.efi
     fi
 
-    cp /data/httpboot/${version}/ipxe.efi.cfg /data/httpboot/${version}/ipxe.efi.cfg.tmp
-    echo "set url http://${SERVER_IP}/${version}" >> /httpboot/${version}/ipxe.efi.cfg
-    cat /data/httpboot/${version}/ipxe.efi.cfg.tmp >> /httpboot/${version}/ipxe.efi.cfg
-    rm /data/httpboot/${version}/ipxe.efi.cfg.tmp
 done
 IFS=$OLD_IFS
 echo "---"
