@@ -54,5 +54,6 @@ docker run --rm -it --net=host --privileged \
 | `DHCP_RANGE_START`| In `standalone` mode, the start of the IP range to lease. | | `192.168.1.100` |
 | `DHCP_RANGE_END`| In `standalone` mode, the end of the IP range to lease. | | `192.168.1.150` |
 | `DHCP_SUBNET_MASK`| In `standalone` mode, the subnet mask for the lease. | `255.255.255.0` | `255.255.255.0` |
-| `DHCP_ROUTER`| In `standalone` mode, the default gateway for clients. | | `192.168.1.1` |
+| `DHCP_DOMAIN_NAME` | In `proxy` or `standalone` mode, the domain name for DHCP clients. | (none) | `pxeboot.local` |
+| `DHCP_BROADCAST_ADDRESS` | In `proxy` or `standalone` mode, the broadcast address for the network. | (none) | `192.168.0.255` |
 

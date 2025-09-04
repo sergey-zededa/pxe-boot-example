@@ -29,6 +29,8 @@ DHCP_RANGE_START=${DHCP_RANGE_START:=""}
 DHCP_RANGE_END=${DHCP_RANGE_END:=""}
 DHCP_SUBNET_MASK=${DHCP_SUBNET_MASK:="255.255.255.0"}
 DHCP_ROUTER=${DHCP_ROUTER:=""}
+DHCP_DOMAIN_NAME=${DHCP_DOMAIN_NAME:=""}
+DHCP_BROADCAST_ADDRESS=${DHCP_BROADCAST_ADDRESS:=""}
 
 echo "iPXE Server IP configured to: ${SERVER_IP}"
 echo "Listening on interface: ${LISTEN_INTERFACE}"
@@ -50,7 +52,7 @@ for version in $EVE_VERSIONS; do
         
         echo "Extracting assets for version ${version}..."
         mkdir -p "/data/httpboot/${version}"
-tar -xvf "/data/downloads/netboot-${version}.tar" -C "/data/httpboot/${version}"
+        tar -xvf "/data/downloads/netboot-${version}.tar" -C "/data/httpboot/${version}"
         rm "/data/downloads/netboot-${version}.tar"
     else
         echo "Version ${version} found in cache. Skipping download."
@@ -91,7 +93,20 @@ elif [ "$DHCP_MODE" = "proxy" ]; then
     if [ -n "$PRIMARY_DHCP_IP" ]; then
         PROXY_IP_ARG=",${PRIMARY_DHCP_IP}"
     fi
-    echo "dhcp-range=${SERVER_IP},proxy${PROXY_IP_ARG}" >> /etc/dnsmasq.conf
+    # Calculate network address for proxy DHCP
+    NETWORK_ADDRESS=$(echo ${SERVER_IP} | awk -F. '{print $1"."$2"."$3".0"}')
+    echo "dhcp-range=${NETWORK_ADDRESS},proxy,${DHCP_SUBNET_MASK}" >> /etc/dnsmasq.conf
+    if [ -n "$DHCP_ROUTER" ]; then
+        echo "dhcp-option=3,${DHCP_ROUTER}" >> /etc/dnsmasq.conf
+    fi
+    if [ -n "$DHCP_DOMAIN_NAME" ]; then
+        echo "dhcp-option=15,${DHCP_DOMAIN_NAME}" >> /etc/dnsmasq.conf
+    fi
+    if [ -n "$DHCP_BROADCAST_ADDRESS" ]; then
+        echo "dhcp-option=28,${DHCP_BROADCAST_ADDRESS}" >> /etc/dnsmasq.conf
+    fi
+    echo "dhcp-match=set:ipxe,175" >> /etc/dnsmasq.conf
+    echo "dhcp-vendorclass=BIOS,PXEClient:Arch:00000" >> /etc/dnsmasq.conf
 else
     echo "Error: Invalid DHCP_MODE specified. Must be 'proxy' or 'standalone'."
     exit 1
@@ -105,7 +120,7 @@ fi
 # === 4. Generate Root iPXE Menu Script ===
 echo "Generating iPXE boot menu..."
 
-cat > /tftpboot/boot.ipxe <<- EOF
+cat > /tftpboot/boot.ipxe <<-"EOF"
 #!ipxe
 
 menu EVE-OS Version Selection
@@ -121,14 +136,15 @@ for version in $EVE_VERSIONS; do
 done
 IFS=$OLD_IFS
 
-cat >> /tftpboot/boot.ipxe <<- EOF
+cat >> /tftpboot/boot.ipxe <<-"EOF"
 
 item --gap -- ------------------------------------------
 item shell Drop to iPXE shell
 item reboot Reboot computer
 
 choose --timeout ${BOOT_MENU_TIMEOUT}000 --default eve_1 selected
-goto 
+goto ${selected}
+
 EOF
 
 item_num=1
@@ -141,7 +157,7 @@ for version in $EVE_VERSIONS; do
 done
 IFS=$OLD_IFS
 
-cat >> /tftpboot/boot.ipxe <<- EOF
+cat >> /tftpboot/boot.ipxe <<-"EOF"
 
 :shell
 shell
