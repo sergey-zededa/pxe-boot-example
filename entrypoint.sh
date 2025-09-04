@@ -52,8 +52,8 @@ for version in $EVE_VERSIONS; do
         
         echo "Extracting assets for version ${version}..."
         mkdir -p "/data/httpboot/${version}"
-tar -xvf "/data/downloads/netboot-${version}.tar" -C "/data/httpboot/${version}"
-rm "/data/downloads/netboot-${version}.tar"
+        tar -xvf "/data/downloads/netboot-${version}.tar" -C "/data/httpboot/${version}"
+        rm "/data/downloads/netboot-${version}.tar"
     else
         echo "Version ${version} found in cache. Skipping download."
     fi
@@ -63,6 +63,10 @@ rm "/data/downloads/netboot-${version}.tar"
         echo "Copying iPXE bootloader from default version ${DEFAULT_VERSION}..."
         cp "/data/httpboot/${DEFAULT_VERSION}/ipxe.efi" /tftpboot/ipxe.efi
     fi
+
+    echo "set url http://${SERVER_IP}/${version}" >> /tftpboot/${version}/ipxe.efi.cfg
+    cat /data/httpboot/${version}/ipxe.efi.cfg >> /tftpboot/${version}/ipxe.efi.cfg
+
 done
 IFS=$OLD_IFS
 echo "---"
