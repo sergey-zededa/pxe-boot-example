@@ -78,6 +78,7 @@ echo "bind-interfaces" >> /etc/dnsmasq.conf
 echo "enable-tftp" >> /etc/dnsmasq.conf
 echo "tftp-root=/tftpboot" >> /etc/dnsmasq.conf
 echo "dhcp-boot=boot.ipxe,,${SERVER_IP}" >> /etc/dnsmasq.conf
+pxe-service=x86PC,"PXE Network Boot",boot.ipxe,,${SERVER_IP}
 
 if [ "$DHCP_MODE" = "standalone" ]; then
     echo "Configuring standalone DHCP mode..."
