@@ -187,6 +187,8 @@ goto start
 
 EOF
 
+cp /tftpboot/boot.ipxe /tftpboot/autoexec.ipxe
+
 # === 5. Start Services ===
 echo "Starting nginx..."
 nginx
