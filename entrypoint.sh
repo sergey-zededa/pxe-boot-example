@@ -76,7 +76,14 @@ echo "port=0" >> /etc/dnsmasq.conf # ADDED THIS LINE
 echo "interface=${LISTEN_INTERFACE}" >> /etc/dnsmasq.conf
 echo "enable-tftp" >> /etc/dnsmasq.conf
 echo "tftp-root=/tftpboot" >> /etc/dnsmasq.conf
-echo "dhcp-boot=boot.ipxe,,${SERVER_IP}" >> /etc/dnsmasq.conf
+# Identify UEFI (Arch 7) clients
+echo "dhcp-match=efi,option:client-arch,7" >> /etc/dnsmasq.conf
+# Legacy BIOS clients get your text menu
+echo "dhcp-boot=undionly.kpxe,pxeserver,${SERVER_IP}" >> /etc/dnsmasq.conf
+# UEFI clients get the EFI loader
+echo "dhcp-boot=tag:efi,ipxe.efi,,${SERVER_IP}" >> /etc/dnsmasq.conf
+# After the NBP (undionly.kpxe or ipxe.efi) runs, it will fetch boot.ipxe over HTTP
+
 echo "pxe-service=x86PC,\"PXE Network Boot\",boot.ipxe,,${SERVER_IP}" >> /etc/dnsmasq.conf
 echo "tftp-no-blocksize" >> /etc/dnsmasq.conf
 
