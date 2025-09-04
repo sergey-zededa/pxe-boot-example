@@ -157,8 +157,9 @@ goto start
 
 EOF
 
-# TEMPORARY DEBUG: Do not start services, just print config and exit
-echo "---"
-echo "Contents of /etc/dnsmasq.conf:"
-cat /etc/dnsmasq.conf
-exit 0
+# === 5. Start Services ===
+echo "Starting nginx..."
+nginx
+
+echo "Starting dnsmasq..."
+dnsmasq --no-daemon
