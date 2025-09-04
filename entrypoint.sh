@@ -83,9 +83,10 @@ echo "dhcp-boot=undionly.kpxe,pxeserver,${SERVER_IP}" >> /etc/dnsmasq.conf
 # UEFI clients get the EFI loader
 echo "dhcp-boot=tag:efi,ipxe.efi,,${SERVER_IP}" >> /etc/dnsmasq.conf
 # After the NBP (undionly.kpxe or ipxe.efi) runs, it will fetch boot.ipxe over HTTP
-
 echo "pxe-service=x86PC,\"PXE Network Boot\",boot.ipxe,,${SERVER_IP}" >> /etc/dnsmasq.conf
 echo "tftp-no-blocksize" >> /etc/dnsmasq.conf
+# For iPXE (user class)
+echo "dhcp-option=tag:ipxe,script-url,http://${SERVER_IP}/boot.ipxe" >> /etc/dnsmasq.conf
 
 if [ "$DHCP_MODE" = "standalone" ]; then
     echo "Configuring standalone DHCP mode..."
