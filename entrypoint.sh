@@ -120,6 +120,8 @@ fi
 # === 4. Generate Root iPXE Menu Script ===
 echo "Generating iPXE boot menu..."
 
+echo "Generating iPXE boot menu..."
+
 cat > /tftpboot/boot.ipxe <<- EOF
 #!ipxe
 
@@ -143,8 +145,8 @@ item --gap -- ------------------------------------------
 item shell Drop to iPXE shell
 item reboot Reboot computer
 
-choose --timeout ${BOOT_MENU_TIMEOUT}000 --default eve_1 selected
-goto ${selected}
+choose --timeout ${BOOT_MENU_TIMEOUT}000 --default eve_1 selected || goto start
+goto \${selected}
 
 EOF
 
