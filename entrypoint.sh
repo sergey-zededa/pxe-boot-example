@@ -145,7 +145,6 @@ echo "dhcp-boot=tag:ipxe,autoexec.ipxe" >> /etc/dnsmasq.conf
 
 # Set TFTP server options
 echo "dhcp-option=66,${SERVER_IP}" >> /etc/dnsmasq.conf
-echo "next-server=${SERVER_IP}" >> /etc/dnsmasq.conf
 
 # PXE service configuration for proxy DHCP
 echo "pxe-service=tag:bios,x86PC,\"EVE-OS Network Boot\",undionly.kpxe,${SERVER_IP}" >> /etc/dnsmasq.conf
