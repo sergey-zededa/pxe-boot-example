@@ -113,7 +113,8 @@ echo "dhcp-boot=tag:efi64,tag:!ipxe,ipxe.efi,,${SERVER_IP}" >> /etc/dnsmasq.conf
 echo "dhcp-boot=tag:ipxe,autoexec.ipxe,,${SERVER_IP}" >> /etc/dnsmasq.conf
 
 # Set next-server explicitly for all requests
-echo "dhcp-option=next-server,${SERVER_IP}" >> /etc/dnsmasq.conf
+echo "dhcp-option=66,${SERVER_IP}" >> /etc/dnsmasq.conf
+echo "next-server=${SERVER_IP}" >> /etc/dnsmasq.conf
 
 # PXE service configuration for proxy DHCP
 echo "pxe-service=tag:bios,x86PC,\"EVE-OS Network Boot\",undionly.kpxe,${SERVER_IP}" >> /etc/dnsmasq.conf
