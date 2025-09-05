@@ -112,9 +112,11 @@ echo "dhcp-boot=tag:efi64,tag:!ipxe,ipxe.efi,,${SERVER_IP}" >> /etc/dnsmasq.conf
 # Once iPXE is loaded, serve the boot script directly via TFTP
 echo "dhcp-boot=tag:ipxe,autoexec.ipxe,,${SERVER_IP}" >> /etc/dnsmasq.conf
 
-# Set next-server explicitly for all requests
+# Set TFTP server explicitly
 echo "dhcp-option=66,${SERVER_IP}" >> /etc/dnsmasq.conf
-echo "next-server=${SERVER_IP}" >> /etc/dnsmasq.conf
+
+# Set default boot parameters
+echo "dhcp-boot=ipxe.efi,,${SERVER_IP}" >> /etc/dnsmasq.conf
 
 # PXE service configuration for proxy DHCP
 echo "pxe-service=tag:bios,x86PC,\"EVE-OS Network Boot\",undionly.kpxe,${SERVER_IP}" >> /etc/dnsmasq.conf
@@ -162,9 +164,12 @@ echo "Generating iPXE boot menu..."
 cat > /tftpboot/boot.ipxe <<- EOF
 #!ipxe
 
-# Set TFTP server explicitly
-set next-server ${SERVER_IP}
+# Force TFTP server settings
+set keep-san 1
+set initiator-iqn iqn.ipxe
+set tftp-server ${SERVER_IP}
 set filename ipxe.efi.cfg
+set dns ${SERVER_IP}
 
 :start
 menu EVE-OS Version Selection
