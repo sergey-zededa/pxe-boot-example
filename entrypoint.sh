@@ -65,6 +65,8 @@ for version in $EVE_VERSIONS; do
     # Inject correct URL into ipxe.efi.cfg
     echo "Injecting URL into ipxe.efi.cfg... 'set url http://${SERVER_IP}/${version}/'"
     # Use sed to handle both commented and uncommented versions with proper spacing
+    # Update ipxe.efi.cfg with DHCP and URL configuration
+    sed -i "1i\\dhcp\\n" "/data/httpboot/${version}/ipxe.efi.cfg"
     sed -i "s|^#\s*set url.*|set url http://${SERVER_IP}/${version}/|; s|^\s*set url.*|set url http://${SERVER_IP}/${version}/|" "/data/httpboot/${version}/ipxe.efi.cfg"
 
     # Verify URL injection
@@ -111,9 +113,12 @@ echo "dhcp-boot=tag:efi64,tag:!ipxe,ipxe.efi,,${SERVER_IP}" >> /etc/dnsmasq.conf
 echo "dhcp-boot=tag:ipxe,http://${SERVER_IP}/boot.ipxe" >> /etc/dnsmasq.conf
 
 # PXE service configuration for proxy DHCP
-echo "pxe-service=tag:bios,x86PC,\"EVE-OS Network Boot\",undionly.kpxe" >> /etc/dnsmasq.conf
-echo "pxe-service=tag:efi32,IA32_EFI,\"EVE-OS Network Boot\",ipxe.efi" >> /etc/dnsmasq.conf
-echo "pxe-service=tag:efi64,X86-64_EFI,\"EVE-OS Network Boot\",ipxe.efi" >> /etc/dnsmasq.conf
+echo "pxe-service=tag:bios,x86PC,\"EVE-OS Network Boot\",undionly.kpxe,${SERVER_IP}" >> /etc/dnsmasq.conf
+echo "pxe-service=tag:efi32,IA32_EFI,\"EVE-OS Network Boot\",ipxe.efi,${SERVER_IP}" >> /etc/dnsmasq.conf
+echo "pxe-service=tag:efi64,X86-64_EFI,\"EVE-OS Network Boot\",ipxe.efi,${SERVER_IP}" >> /etc/dnsmasq.conf
+
+# Ensure TFTP server address is explicitly set
+echo "dhcp-option=66,${SERVER_IP}" >> /etc/dnsmasq.conf
 
 # TFTP configuration
 echo "tftp-no-blocksize" >> /etc/dnsmasq.conf
