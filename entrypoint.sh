@@ -1,5 +1,4 @@
-#!/bin/sh
-
+#!/bin/bash
 # Exit on any error
 set -e
 
@@ -49,15 +48,15 @@ for version in $EVE_VERSIONS; do
         echo "Version ${version} not found in cache. Downloading..."
         EVE_TAR_URL="https://github.com/lf-edge/eve/releases/download/${version}/amd64.kvm.generic.installer-net.tar"
         curl -L -o "/data/downloads/netboot-${version}.tar" "${EVE_TAR_URL}"
-        
+
         echo "Extracting assets for version ${version}..."
         mkdir -p "/data/httpboot/${version}"
-        tar -xvf "/data/downloads/netboot-${version}.tar" -C "/data/httpboot/${version}"
+        tar -xvf "/data/downloads/netboot-${version}.tar" -C "/data/httpboot/${version}/"
         rm "/data/downloads/netboot-${version}.tar"
-        cp "/data/httpboot/${version}/ipxe.efi.cfg" "/data/httpboot/${version}/ipxe.efi.cfg.tmp"
-        echo "set url http://${SERVER_IP}/${version}" >> "/httpboot/${version}/ipxe.efi.cfg"
-        cat "/data/httpboot/${version}/ipxe.efi.cfg.tmp" >> "/httpboot/${version}/ipxe.efi.cfg"
-        rm "/data/httpboot/${version}/ipxe.efi.cfg.tmp"
+        # Inject correct URL into ipxe.efi.cfg
+        echo "Inject correct URL into ipxe.efi.cfg... 'set url http://${SERVER_IP}/${version}/'"
+        # Use sed to uncomment and replace the 'set url' line in place
+        sed -i "s|^#set url.*|set url http://${SERVER_IP}/${version}|; s|^set url.*|set url http://${SERVER_IP}/${version}|" "/data/httpboot/${version}/ipxe.efi.cfg"
     else
         echo "Version ${version} found in cache. Skipping download."
     fi
