@@ -143,11 +143,9 @@ echo "dhcp-match=set:efi64,option:client-arch,9" >> /etc/dnsmasq.conf
 echo "dhcp-boot=tag:!ipxe,tag:efi64,ipxe.efi" >> /etc/dnsmasq.conf
 echo "dhcp-boot=tag:ipxe,autoexec.ipxe" >> /etc/dnsmasq.conf
 
-# Ensure TFTP server is set correctly
+# Set TFTP server options
 echo "dhcp-option=66,${SERVER_IP}" >> /etc/dnsmasq.conf
-
-# Force next-server to our IP
-echo "dhcp-option=next-server,${SERVER_IP}" >> /etc/dnsmasq.conf
+echo "next-server=${SERVER_IP}" >> /etc/dnsmasq.conf
 
 # PXE service configuration for proxy DHCP
 echo "pxe-service=tag:bios,x86PC,\"EVE-OS Network Boot\",undionly.kpxe,${SERVER_IP}" >> /etc/dnsmasq.conf
