@@ -134,15 +134,13 @@ echo "dhcp-boot=tag:efi64,tag:!ipxe,ipxe.efi,,${SERVER_IP}" >> /etc/dnsmasq.conf
 # Once iPXE is loaded, serve the boot script directly via TFTP
 echo "dhcp-boot=tag:ipxe,autoexec.ipxe,,${SERVER_IP}" >> /etc/dnsmasq.conf
 
-# Configure chain loading
+# Configure client detection
 echo "dhcp-match=set:ipxe,175" >> /etc/dnsmasq.conf
-echo "tag-if=set:efi64,option:client-arch,7" >> /etc/dnsmasq.conf
-echo "tag-if=set:efi64,option:client-arch,9" >> /etc/dnsmasq.conf
+echo "dhcp-match=set:efi64,option:client-arch,7" >> /etc/dnsmasq.conf
+echo "dhcp-match=set:efi64,option:client-arch,9" >> /etc/dnsmasq.conf
 
-# Initial non-iPXE UEFI clients get ipxe.efi
-echo "dhcp-boot=tag:efi64,tag:!ipxe,ipxe.efi" >> /etc/dnsmasq.conf
-
-# iPXE clients get autoexec.ipxe
+# Boot file selection based on client type
+echo "dhcp-boot=tag:!ipxe,tag:efi64,ipxe.efi" >> /etc/dnsmasq.conf
 echo "dhcp-boot=tag:ipxe,autoexec.ipxe" >> /etc/dnsmasq.conf
 
 # Ensure TFTP server is set correctly
