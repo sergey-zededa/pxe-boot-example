@@ -134,17 +134,27 @@ echo "dhcp-boot=tag:efi64,tag:!ipxe,ipxe.efi,,${SERVER_IP}" >> /etc/dnsmasq.conf
 # Once iPXE is loaded, serve the boot script directly via TFTP
 echo "dhcp-boot=tag:ipxe,autoexec.ipxe,,${SERVER_IP}" >> /etc/dnsmasq.conf
 
-# Configure client detection
-echo "dhcp-match=set:ipxe,175" >> /etc/dnsmasq.conf
-echo "dhcp-match=set:efi64,option:client-arch,7" >> /etc/dnsmasq.conf
-echo "dhcp-match=set:efi64,option:client-arch,9" >> /etc/dnsmasq.conf
+# Set up proxy DHCP mode
+echo "dhcp-range=${NETWORK_ADDRESS},proxy,${DHCP_SUBNET_MASK}" >> /etc/dnsmasq.conf
 
-# Boot file selection based on client type
-echo "dhcp-boot=tag:!ipxe,tag:efi64,ipxe.efi" >> /etc/dnsmasq.conf
-echo "dhcp-boot=tag:ipxe,autoexec.ipxe" >> /etc/dnsmasq.conf
+# TFTP server configuration
+echo "enable-tftp" >> /etc/dnsmasq.conf
+echo "tftp-root=/tftpboot" >> /etc/dnsmasq.conf
+
+# Client type detection
+echo "dhcp-match=set:ipxe,175" >> /etc/dnsmasq.conf
+echo "dhcp-vendorclass=set:efi64,PXEClient:Arch:00007" >> /etc/dnsmasq.conf
+echo "dhcp-vendorclass=set:efi64,PXEClient:Arch:00009" >> /etc/dnsmasq.conf
 
 # Set TFTP server options
 echo "dhcp-option=66,${SERVER_IP}" >> /etc/dnsmasq.conf
+echo "dhcp-option=67,ipxe.efi" >> /etc/dnsmasq.conf
+
+# Boot configuration
+echo "pxe-service=tag:efi64,X86-64_EFI,\"EVE-OS Network Boot\",ipxe.efi" >> /etc/dnsmasq.conf
+
+# iPXE client gets HTTP config
+echo "dhcp-boot=tag:ipxe,http://${SERVER_IP}/boot.ipxe" >> /etc/dnsmasq.conf
 
 # PXE service configuration for proxy DHCP
 echo "pxe-service=tag:bios,x86PC,\"EVE-OS Network Boot\",undionly.kpxe,${SERVER_IP}" >> /etc/dnsmasq.conf
@@ -189,14 +199,8 @@ fi
 # === 4. Generate Root iPXE Menu Script ===
 echo "Generating iPXE boot menu..."
 
-# Create a simple autoexec.ipxe that chains to our menu
-cat > /tftpboot/autoexec.ipxe <<- EOF
-#!ipxe
-dhcp
-chain --autofree http://${SERVER_IP}/boot.ipxe || shell
-EOF
-
-# Create the main boot menu
+# Create the main menu that will be served over HTTP
+echo "Generating boot.ipxe in HTTP root..."
 cat > /data/httpboot/boot.ipxe <<- EOF
 #!ipxe
 
