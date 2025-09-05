@@ -65,8 +65,30 @@ for version in $EVE_VERSIONS; do
     # Inject correct URL into ipxe.efi.cfg
     echo "Injecting URL into ipxe.efi.cfg... 'set url http://${SERVER_IP}/${version}/'"
     # Use sed to handle both commented and uncommented versions with proper spacing
-    # Update ipxe.efi.cfg with DHCP and server configuration
-    sed -i "1i#!ipxe\\nset net0/next-server ${SERVER_IP}\\nset net0/tftp-server ${SERVER_IP}\\ndhcp net0\\n" "/data/httpboot/${version}/ipxe.efi.cfg"
+    # Create iPXE configuration file
+    cat > "/data/httpboot/${version}/ipxe.efi.cfg" <<- EOF
+#!ipxe
+dhcp
+
+# Set boot parameters
+set url http://${SERVER_IP}/${version}/
+set console console=ttyS0 console=ttyS1 console=ttyS2 console=ttyAMA0 console=ttyAMA1 console=tty0
+set eve_args eve_soft_serial=\${mac:hexhyp} eve_reboot_after_install getty
+set installer_args root=/initrd.image find_boot=netboot overlaytmpfs fastboot
+
+# Hardware-specific console settings
+iseq \${smbios/manufacturer} Huawei && set console console=ttyAMA0,115200n8 ||
+iseq \${smbios/manufacturer} Huawei && set platform_tweaks pcie_aspm=off pci=pcie_bus_perf ||
+iseq \${smbios/manufacturer} Supermicro && set console console=ttyS1,115200n8 ||
+iseq \${smbios/manufacturer} QEMU && set console console=hvc0 console=ttyS0 ||
+
+# Chain to appropriate bootloader
+iseq \${buildarch} x86_64 && chain \${url}EFI/BOOT/BOOTX64.EFI ||
+iseq \${buildarch} arm64 && chain \${url}EFI/BOOT/BOOTAA64.EFI ||
+iseq \${buildarch} riscv64 && chain \${url}EFI/BOOT/BOOTRISCV64.EFI ||
+
+boot
+EOF
     sed -i "s|^#\s*set url.*|set url http://${SERVER_IP}/${version}/|; s|^\s*set url.*|set url http://${SERVER_IP}/${version}/|" "/data/httpboot/${version}/ipxe.efi.cfg"
 
     # Verify URL injection
@@ -112,19 +134,32 @@ echo "dhcp-boot=tag:efi64,tag:!ipxe,ipxe.efi,,${SERVER_IP}" >> /etc/dnsmasq.conf
 # Once iPXE is loaded, serve the boot script directly via TFTP
 echo "dhcp-boot=tag:ipxe,autoexec.ipxe,,${SERVER_IP}" >> /etc/dnsmasq.conf
 
-# Configure chain loading for different boot stages
-echo "# Stage 1: Initial PXE boot loads iPXE" >> /etc/dnsmasq.conf
+# Basic dnsmasq configuration
+echo "port=0" >> /etc/dnsmasq.conf
+echo "interface=${LISTEN_INTERFACE}" >> /etc/dnsmasq.conf
+echo "bind-interfaces" >> /etc/dnsmasq.conf
+echo "log-dhcp" >> /etc/dnsmasq.conf
+
+# TFTP configuration
+echo "enable-tftp" >> /etc/dnsmasq.conf
+echo "tftp-root=/tftpboot" >> /etc/dnsmasq.conf
+
+# Configure chain loading
 echo "dhcp-match=set:ipxe,175" >> /etc/dnsmasq.conf
-echo "dhcp-match=set:ipxe-http,176" >> /etc/dnsmasq.conf
+echo "tag-if=set:efi64,option:client-arch,7" >> /etc/dnsmasq.conf
+echo "tag-if=set:efi64,option:client-arch,9" >> /etc/dnsmasq.conf
 
-# Non-iPXE clients get iPXE binary
-echo "dhcp-boot=tag:!ipxe,ipxe.efi,,${SERVER_IP}" >> /etc/dnsmasq.conf
+# Initial non-iPXE UEFI clients get ipxe.efi
+echo "dhcp-boot=tag:efi64,tag:!ipxe,ipxe.efi" >> /etc/dnsmasq.conf
 
-# iPXE clients get directed to our HTTP server
-echo "dhcp-boot=tag:ipxe,http://${SERVER_IP}/${DEFAULT_VERSION}/ipxe.efi.cfg,,${SERVER_IP}" >> /etc/dnsmasq.conf
+# iPXE clients get autoexec.ipxe
+echo "dhcp-boot=tag:ipxe,autoexec.ipxe" >> /etc/dnsmasq.conf
 
-# Set TFTP server explicitly
+# Ensure TFTP server is set correctly
 echo "dhcp-option=66,${SERVER_IP}" >> /etc/dnsmasq.conf
+
+# Force next-server to our IP
+echo "dhcp-option=next-server,${SERVER_IP}" >> /etc/dnsmasq.conf
 
 # PXE service configuration for proxy DHCP
 echo "pxe-service=tag:bios,x86PC,\"EVE-OS Network Boot\",undionly.kpxe,${SERVER_IP}" >> /etc/dnsmasq.conf
@@ -169,15 +204,16 @@ fi
 # === 4. Generate Root iPXE Menu Script ===
 echo "Generating iPXE boot menu..."
 
-cat > /tftpboot/boot.ipxe <<- EOF
+# Create a simple autoexec.ipxe that chains to our menu
+cat > /tftpboot/autoexec.ipxe <<- EOF
 #!ipxe
+dhcp
+chain --autofree http://${SERVER_IP}/boot.ipxe || shell
+EOF
 
-# Force TFTP server settings
-set keep-san 1
-set initiator-iqn iqn.ipxe
-set tftp-server ${SERVER_IP}
-set filename ipxe.efi.cfg
-set dns ${SERVER_IP}
+# Create the main boot menu
+cat > /data/httpboot/boot.ipxe <<- EOF
+#!ipxe
 
 :start
 menu EVE-OS Version Selection
