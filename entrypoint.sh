@@ -66,7 +66,7 @@ for version in $EVE_VERSIONS; do
     echo "Injecting URL into ipxe.efi.cfg... 'set url http://${SERVER_IP}/${version}/'"
     # Use sed to handle both commented and uncommented versions with proper spacing
     # Update ipxe.efi.cfg with DHCP and server configuration
-    sed -i "1i#!ipxe\\nset net0/next-server ${SERVER_IP}\\ndhcp\\n" "/data/httpboot/${version}/ipxe.efi.cfg"
+    sed -i "1i#!ipxe\\nset net0/next-server ${SERVER_IP}\\nset net0/tftp-server ${SERVER_IP}\\ndhcp net0\\n" "/data/httpboot/${version}/ipxe.efi.cfg"
     sed -i "s|^#\s*set url.*|set url http://${SERVER_IP}/${version}/|; s|^\s*set url.*|set url http://${SERVER_IP}/${version}/|" "/data/httpboot/${version}/ipxe.efi.cfg"
 
     # Verify URL injection
@@ -112,11 +112,19 @@ echo "dhcp-boot=tag:efi64,tag:!ipxe,ipxe.efi,,${SERVER_IP}" >> /etc/dnsmasq.conf
 # Once iPXE is loaded, serve the boot script directly via TFTP
 echo "dhcp-boot=tag:ipxe,autoexec.ipxe,,${SERVER_IP}" >> /etc/dnsmasq.conf
 
+# Configure chain loading for different boot stages
+echo "# Stage 1: Initial PXE boot loads iPXE" >> /etc/dnsmasq.conf
+echo "dhcp-match=set:ipxe,175" >> /etc/dnsmasq.conf
+echo "dhcp-match=set:ipxe-http,176" >> /etc/dnsmasq.conf
+
+# Non-iPXE clients get iPXE binary
+echo "dhcp-boot=tag:!ipxe,ipxe.efi,,${SERVER_IP}" >> /etc/dnsmasq.conf
+
+# iPXE clients get directed to our HTTP server
+echo "dhcp-boot=tag:ipxe,http://${SERVER_IP}/${DEFAULT_VERSION}/ipxe.efi.cfg,,${SERVER_IP}" >> /etc/dnsmasq.conf
+
 # Set TFTP server explicitly
 echo "dhcp-option=66,${SERVER_IP}" >> /etc/dnsmasq.conf
-
-# Set default boot parameters
-echo "dhcp-boot=ipxe.efi,,${SERVER_IP}" >> /etc/dnsmasq.conf
 
 # PXE service configuration for proxy DHCP
 echo "pxe-service=tag:bios,x86PC,\"EVE-OS Network Boot\",undionly.kpxe,${SERVER_IP}" >> /etc/dnsmasq.conf
