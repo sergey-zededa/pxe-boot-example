@@ -63,9 +63,19 @@ for version in $EVE_VERSIONS; do
         cp "/data/httpboot/${DEFAULT_VERSION}/ipxe.efi" /tftpboot/ipxe.efi
     fi
     # Inject correct URL into ipxe.efi.cfg
-    echo "Inject correct URL into ipxe.efi.cfg... 'set url http://${SERVER_IP}/${version}/'"
-    # Use sed to uncomment and replace the 'set url' line in place
-    sed -i "s|^#set url.*|set url http://${SERVER_IP}/${version}|; s|^set url.*|set url http://${SERVER_IP}/${version}|" "/data/httpboot/${version}/ipxe.efi.cfg"
+    echo "Injecting URL into ipxe.efi.cfg... 'set url http://${SERVER_IP}/${version}/'"
+    # Use sed to handle both commented and uncommented versions with proper spacing
+    sed -i "s|^#\s*set url.*|set url http://${SERVER_IP}/${version}/|; s|^\s*set url.*|set url http://${SERVER_IP}/${version}/|" "/data/httpboot/${version}/ipxe.efi.cfg"
+
+    # Verify URL injection
+    echo "Verifying URL injection..."
+    if ! grep -q "^set url http://${SERVER_IP}/${version}/" "/data/httpboot/${version}/ipxe.efi.cfg"; then
+        echo "Warning: URL injection may have failed for version ${version}. Please verify the configuration."
+        echo "Current 'set url' line in ipxe.efi.cfg:"
+        grep "set url" "/data/httpboot/${version}/ipxe.efi.cfg" || echo "No 'set url' line found!"
+    else
+        echo "URL successfully injected for version ${version}"
+    fi
 
 done
 IFS=$OLD_IFS
