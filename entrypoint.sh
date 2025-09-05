@@ -32,6 +32,13 @@ validate_environment() {
 generate_dnsmasq_conf() {
     echo "Generating dnsmasq configuration..."
 
+    # Create initial TFTP configuration that chains to HTTP
+    cat > /tftpboot/ipxe.efi.cfg <<EOL
+#!ipxe
+dhcp
+chain --autofree http://${SERVER_IP}/boot.ipxe || shell
+EOL
+
     # Base configuration
     cat > /etc/dnsmasq.conf <<EOL
 # Base Configuration
@@ -49,10 +56,15 @@ dhcp-match=set:ipxe,175
 dhcp-match=set:efi64,option:client-arch,7
 dhcp-match=set:efi64,option:client-arch,9
 
-# Boot Configuration
+# Non-iPXE UEFI clients get iPXE binary
 dhcp-boot=tag:!ipxe,tag:efi64,ipxe.efi,,${SERVER_IP}
 pxe-service=tag:efi64,X86-64_EFI,"EVE-OS Network Boot",ipxe.efi
-dhcp-boot=tag:ipxe,http://${SERVER_IP}/boot.ipxe
+
+# iPXE gets TFTP config that chains to HTTP
+dhcp-boot=tag:ipxe,ipxe.efi.cfg,,${SERVER_IP}
+
+# Force TFTP Server
+dhcp-option=66,${SERVER_IP}
 EOL
 
     # DHCP Mode-specific configuration
@@ -252,60 +264,12 @@ echo "Starting nginx..."
 nginx
 
 echo "Starting dnsmasq..."
+# Start services
+echo "Starting nginx..."
+nginx
+
+echo "Starting dnsmasq..."
 exec dnsmasq --no-daemon --conf-file=/etc/dnsmasq.conf --log-facility=-
-echo "port=0" >> /etc/dnsmasq.conf
-echo "interface=${LISTEN_INTERFACE}" >> /etc/dnsmasq.conf
-echo "bind-interfaces" >> /etc/dnsmasq.conf
-echo "enable-tftp" >> /etc/dnsmasq.conf
-echo "tftp-root=/tftpboot" >> /etc/dnsmasq.conf
-
-# Architecture detection for BIOS vs UEFI
-echo "dhcp-match=set:bios,option:client-arch,0" >> /etc/dnsmasq.conf
-echo "dhcp-match=set:efi32,option:client-arch,6" >> /etc/dnsmasq.conf
-echo "dhcp-match=set:efi64,option:client-arch,7" >> /etc/dnsmasq.conf
-echo "dhcp-match=set:efi64,option:client-arch,9" >> /etc/dnsmasq.conf
-
-# iPXE detection - option 175 is sent by iPXE clients
-echo "dhcp-match=set:ipxe,175" >> /etc/dnsmasq.conf
-
-# Boot configuration for different architectures
-# BIOS clients get undionly.kpxe, UEFI clients get ipxe.efi
-echo "dhcp-boot=tag:bios,tag:!ipxe,undionly.kpxe,,${SERVER_IP}" >> /etc/dnsmasq.conf
-echo "dhcp-boot=tag:efi32,tag:!ipxe,ipxe.efi,,${SERVER_IP}" >> /etc/dnsmasq.conf
-echo "dhcp-boot=tag:efi64,tag:!ipxe,ipxe.efi,,${SERVER_IP}" >> /etc/dnsmasq.conf
-
-# Once iPXE is loaded, serve the boot script directly via TFTP
-echo "dhcp-boot=tag:ipxe,autoexec.ipxe,,${SERVER_IP}" >> /etc/dnsmasq.conf
-
-# Set up proxy DHCP mode
-echo "dhcp-range=${NETWORK_ADDRESS},proxy,${DHCP_SUBNET_MASK}" >> /etc/dnsmasq.conf
-
-# TFTP server configuration
-echo "enable-tftp" >> /etc/dnsmasq.conf
-echo "tftp-root=/tftpboot" >> /etc/dnsmasq.conf
-
-# Client type detection
-echo "dhcp-match=set:ipxe,175" >> /etc/dnsmasq.conf
-echo "dhcp-vendorclass=set:efi64,PXEClient:Arch:00007" >> /etc/dnsmasq.conf
-echo "dhcp-vendorclass=set:efi64,PXEClient:Arch:00009" >> /etc/dnsmasq.conf
-
-# Set TFTP server options
-echo "dhcp-option=66,${SERVER_IP}" >> /etc/dnsmasq.conf
-echo "dhcp-option=67,ipxe.efi" >> /etc/dnsmasq.conf
-
-# Boot configuration
-echo "pxe-service=tag:efi64,X86-64_EFI,\"EVE-OS Network Boot\",ipxe.efi" >> /etc/dnsmasq.conf
-
-# iPXE client gets HTTP config
-echo "dhcp-boot=tag:ipxe,http://${SERVER_IP}/boot.ipxe" >> /etc/dnsmasq.conf
-
-# PXE service configuration for proxy DHCP
-echo "pxe-service=tag:bios,x86PC,\"EVE-OS Network Boot\",undionly.kpxe,${SERVER_IP}" >> /etc/dnsmasq.conf
-echo "pxe-service=tag:efi32,IA32_EFI,\"EVE-OS Network Boot\",ipxe.efi,${SERVER_IP}" >> /etc/dnsmasq.conf
-echo "pxe-service=tag:efi64,X86-64_EFI,\"EVE-OS Network Boot\",ipxe.efi,${SERVER_IP}" >> /etc/dnsmasq.conf
-
-# TFTP configuration
-echo "tftp-no-blocksize" >> /etc/dnsmasq.conf
 
 if [ "$DHCP_MODE" = "standalone" ]; then
     echo "Configuring standalone DHCP mode..."
