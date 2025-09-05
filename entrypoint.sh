@@ -134,16 +134,6 @@ echo "dhcp-boot=tag:efi64,tag:!ipxe,ipxe.efi,,${SERVER_IP}" >> /etc/dnsmasq.conf
 # Once iPXE is loaded, serve the boot script directly via TFTP
 echo "dhcp-boot=tag:ipxe,autoexec.ipxe,,${SERVER_IP}" >> /etc/dnsmasq.conf
 
-# Basic dnsmasq configuration
-echo "port=0" >> /etc/dnsmasq.conf
-echo "interface=${LISTEN_INTERFACE}" >> /etc/dnsmasq.conf
-echo "bind-interfaces" >> /etc/dnsmasq.conf
-echo "log-dhcp" >> /etc/dnsmasq.conf
-
-# TFTP configuration
-echo "enable-tftp" >> /etc/dnsmasq.conf
-echo "tftp-root=/tftpboot" >> /etc/dnsmasq.conf
-
 # Configure chain loading
 echo "dhcp-match=set:ipxe,175" >> /etc/dnsmasq.conf
 echo "tag-if=set:efi64,option:client-arch,7" >> /etc/dnsmasq.conf
