@@ -1,0 +1,22 @@
+# Downloaded and generated files
+ipxe_data/
+test/ipxe_data/
+
+# OS-specific files
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+
+# IDE/Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Test files
+test/*.log
+test/*.qcow2
