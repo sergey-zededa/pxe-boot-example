@@ -1,7 +1,7 @@
 FROM alpine:latest
 
 # 1. Install dependencies
-RUN apk add --no-cache dnsmasq nginx curl tar
+RUN apk add --no-cache dnsmasq nginx curl tar dos2unix
 
 # 2. Create necessary directories
 # /tftpboot is for dnsmasq to serve iPXE files
@@ -12,6 +12,7 @@ RUN mkdir -p /tftpboot /data /run/nginx
 # 3. Copy configuration and scripts
 COPY config/nginx.conf /etc/nginx/nginx.conf
 COPY entrypoint.sh /entrypoint.sh
+RUN dos2unix /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # 4. Expose ports and declare data volume
