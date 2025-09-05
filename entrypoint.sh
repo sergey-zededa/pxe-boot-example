@@ -109,16 +109,13 @@ echo "dhcp-boot=tag:bios,tag:!ipxe,undionly.kpxe,,${SERVER_IP}" >> /etc/dnsmasq.
 echo "dhcp-boot=tag:efi32,tag:!ipxe,ipxe.efi,,${SERVER_IP}" >> /etc/dnsmasq.conf
 echo "dhcp-boot=tag:efi64,tag:!ipxe,ipxe.efi,,${SERVER_IP}" >> /etc/dnsmasq.conf
 
-# Once iPXE is loaded, serve the boot script via HTTP
-echo "dhcp-boot=tag:ipxe,http://${SERVER_IP}/boot.ipxe" >> /etc/dnsmasq.conf
+# Once iPXE is loaded, serve the boot script directly via TFTP
+echo "dhcp-boot=tag:ipxe,autoexec.ipxe,,${SERVER_IP}" >> /etc/dnsmasq.conf
 
 # PXE service configuration for proxy DHCP
 echo "pxe-service=tag:bios,x86PC,\"EVE-OS Network Boot\",undionly.kpxe,${SERVER_IP}" >> /etc/dnsmasq.conf
 echo "pxe-service=tag:efi32,IA32_EFI,\"EVE-OS Network Boot\",ipxe.efi,${SERVER_IP}" >> /etc/dnsmasq.conf
 echo "pxe-service=tag:efi64,X86-64_EFI,\"EVE-OS Network Boot\",ipxe.efi,${SERVER_IP}" >> /etc/dnsmasq.conf
-
-# Ensure TFTP server address is explicitly set
-echo "dhcp-option=66,${SERVER_IP}" >> /etc/dnsmasq.conf
 
 # TFTP configuration
 echo "tftp-no-blocksize" >> /etc/dnsmasq.conf
