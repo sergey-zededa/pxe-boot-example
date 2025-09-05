@@ -53,10 +53,6 @@ for version in $EVE_VERSIONS; do
         mkdir -p "/data/httpboot/${version}"
         tar -xvf "/data/downloads/netboot-${version}.tar" -C "/data/httpboot/${version}/"
         rm "/data/downloads/netboot-${version}.tar"
-        # Inject correct URL into ipxe.efi.cfg
-        echo "Inject correct URL into ipxe.efi.cfg... 'set url http://${SERVER_IP}/${version}/'"
-        # Use sed to uncomment and replace the 'set url' line in place
-        sed -i "s|^#set url.*|set url http://${SERVER_IP}/${version}|; s|^set url.*|set url http://${SERVER_IP}/${version}|" "/data/httpboot/${version}/ipxe.efi.cfg"
     else
         echo "Version ${version} found in cache. Skipping download."
     fi
@@ -66,6 +62,10 @@ for version in $EVE_VERSIONS; do
         echo "Copying iPXE bootloader from default version ${DEFAULT_VERSION}..."
         cp "/data/httpboot/${DEFAULT_VERSION}/ipxe.efi" /tftpboot/ipxe.efi
     fi
+    # Inject correct URL into ipxe.efi.cfg
+    echo "Inject correct URL into ipxe.efi.cfg... 'set url http://${SERVER_IP}/${version}/'"
+    # Use sed to uncomment and replace the 'set url' line in place
+    sed -i "s|^#set url.*|set url http://${SERVER_IP}/${version}|; s|^set url.*|set url http://${SERVER_IP}/${version}|" "/data/httpboot/${version}/ipxe.efi.cfg"
 
 done
 IFS=$OLD_IFS
