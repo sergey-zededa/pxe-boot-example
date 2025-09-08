@@ -1,0 +1,50 @@
+#!ipxe
+
+# Enable debugging
+set debug all
+
+:start
+menu EVE-OS Boot Menu
+item --gap -- Available versions:
+{{menu_items}}
+item
+item --gap -- Tools:
+item shell Drop to iPXE shell
+item reboot Reboot system
+item retry Retry network configuration
+item
+item --gap -- --------------------------------------------
+item --gap Version information:
+item --gap Selected version will boot in {{timeout}} seconds
+item --gap Server IP: {{server_ip}}
+
+choose --timeout {{timeout}}000 --default eve_1 selected || goto menu_error
+goto ${selected}
+
+:menu_error
+echo Menu selection failed
+echo Error: ${errno}
+prompt --timeout 5000 Press any key to retry or wait 5 seconds...
+goto start
+
+{{menu_handlers}}
+
+:shell
+echo Dropping to iPXE shell...
+shell
+goto start
+
+:reboot
+echo Rebooting system...
+reboot
+
+:retry
+echo Retrying network configuration...
+dhcp || goto retry_error
+goto start
+
+:retry_error
+echo DHCP configuration failed
+echo Error: ${errno}
+prompt --timeout 5000 Press any key to return to menu or wait 5 seconds...
+goto start

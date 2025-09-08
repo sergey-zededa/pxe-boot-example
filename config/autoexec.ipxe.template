@@ -40,7 +40,8 @@ echo Network validation successful. Proceeding with boot...
 
 # Chain to main boot configuration
 echo Chaining to boot menu...
-chain --autofree --replace ${boot-url}/latest/ipxe.efi.cfg ||
+echo Attempting to load ${boot-url}/boot.ipxe
+chain --autofree ${boot-url}/boot.ipxe || goto error
 
 :error
 echo Boot failed!
