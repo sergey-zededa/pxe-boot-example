@@ -200,13 +200,15 @@ tftp-root=/tftpboot
 
 # Client Detection
 dhcp-match=set:ipxe,175
-dhcp-match=set:ipxe-ok,option:user-class,iPXE
 dhcp-match=set:efi64,option:client-arch,7
 dhcp-match=set:efi64,option:client-arch,9
 
+# Boot configuration
+dhcp-boot=tag:!ipxe,tag:efi64,ipxe.efi
+dhcp-boot=tag:ipxe,http://${SERVER_IP}/boot.ipxe
+
 # TFTP server configuration
-dhcp-boot=tag:!ipxe,tag:efi64,ipxe.efi,${SERVER_IP},${SERVER_IP}
-dhcp-boot=tag:ipxe,boot.ipxe,${SERVER_IP},${SERVER_IP}
+dhcp-option=66,${SERVER_IP}
 EOL
 
     # DHCP Mode-specific configuration
