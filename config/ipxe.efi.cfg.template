@@ -3,9 +3,10 @@
 # Enable debugging
 set debug all
 
-# Force our server address
-set next-server {{SERVER_IP}}
-set boot-url http://${next-server}/{{VERSION}}
+# Force our server address and boot URL
+set server {{SERVER_IP}}
+set version {{VERSION}}
+set boot-url http://${server}/${version}
 
 # Uncomment ntp lines for devices without RTC (RPI for example)
 #echo Getting the current time from ntp...
@@ -13,8 +14,9 @@ set boot-url http://${next-server}/{{VERSION}}
 #ntp pool.ntp.org || goto retry_ntp
 
 echo iPXE boot starting...
-echo Server: ${next-server}
+echo Server: ${server}
 echo Boot URL: ${boot-url}
+echo Version: ${version}
 
 # Set boot parameters
 set console console=ttyS0,115200n8 console=tty0
