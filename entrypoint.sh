@@ -316,6 +316,10 @@ setup_eve_versions() {
             chown dnsmasq:dnsmasq /tftpboot/ipxe.efi
             chmod 644 /tftpboot/ipxe.efi
             
+            # Create latest symlink
+            (cd /data/httpboot && rm -f latest && ln -sf "${DEFAULT_VERSION}" latest)
+            echo "Created 'latest' symlink to ${DEFAULT_VERSION}"
+            
             # Create 'latest' symlink
             ln -sf "${DEFAULT_VERSION}" /data/httpboot/latest
         fi
