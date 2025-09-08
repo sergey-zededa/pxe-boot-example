@@ -392,7 +392,7 @@ fi
             echo "Version ${version} found in cache"
         fi
 
-# Set up first version as default
+        # Set up first version as default
         if [ -z "$DEFAULT_VERSION" ]; then
             DEFAULT_VERSION=$version
             echo "Setting ${version} as default version"
@@ -432,7 +432,6 @@ fi
                 echo "✓ www-data can read ipxe.efi.cfg in latest directory"
             else
                 echo "✗ WARNING: www-data cannot read ipxe.efi.cfg in latest directory!"
-            fi
             fi
         fi
 
