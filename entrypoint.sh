@@ -286,19 +286,36 @@ setup_eve_versions() {
             echo "Archive contents:"
             ls -la "${TEMP_DIR}"
 
-            # Copy all files to the httpboot directory
-            cp -a "${TEMP_DIR}"/* "/data/httpboot/${version}/"
+            # Set up directory structure
+            mkdir -p "/data/httpboot/${version}/EFI/BOOT/"
+
+            # Handle EFI-related files first
+            if [ -f "${TEMP_DIR}/EFI/BOOT/BOOTX64.EFI" ]; then
+                echo "Copying EFI boot files..."
+                cp -r "${TEMP_DIR}/EFI" "/data/httpboot/${version}/"
+            fi
+
+            # Copy remaining files
+            for file in kernel initrd.img ucode.img rootfs.img ipxe.efi ipxe.efi.cfg; do
+                if [ -f "${TEMP_DIR}/${file}" ]; then
+                    echo "Copying ${file}..."
+                    cp "${TEMP_DIR}/${file}" "/data/httpboot/${version}/"
+                fi
+            done
 
             # Clean up
             rm -rf "${TEMP_DIR}"
             rm "/data/downloads/netboot-${version}.tar"
-
-            # Create EFI boot directory structure
-            mkdir -p "/data/httpboot/${version}/EFI/BOOT/"
             
-            # Move or copy necessary files
+            # Rename rootfs.img if it exists
             [ -f "/data/httpboot/${version}/rootfs.img" ] && mv "/data/httpboot/${version}/rootfs.img" "/data/httpboot/${version}/rootfs_installer.img"
-            [ -f "/data/httpboot/${version}/ipxe.efi" ] && cp "/data/httpboot/${version}/ipxe.efi" "/data/httpboot/${version}/EFI/BOOT/BOOTX64.EFI"
+            
+            # Ensure permissions
+            chown -R www-data:www-data "/data/httpboot/${version}"
+            find "/data/httpboot/${version}" -type f -exec chmod 644 {} \;
+            find "/data/httpboot/${version}" -type d -exec chmod 755 {} \;
+
+            echo "Files extracted and permissions set for version ${version}"
             
             # Set proper permissions for extracted files
             chown -R www-data:www-data "/data/httpboot/${version}"
