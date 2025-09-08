@@ -872,14 +872,9 @@ echo "Running final validation checks..."
 
 # Verify critical files and permissions
 echo "Checking critical files and permissions..."
-CRITICAL_FILES=(
-    "/data/httpboot/boot.ipxe"
-    "/data/httpboot/latest/ipxe.efi"
-    "/data/httpboot/latest/ipxe.efi.cfg"
-    "/data/httpboot/latest/EFI/BOOT/BOOTX64.EFI"
-)
 
-for file in "${CRITICAL_FILES[@]}"; do
+check_file() {
+    local file="$1"
     if [ ! -f "$file" ]; then
         echo "ERROR: Critical file missing: $file"
         exit 1
@@ -889,7 +884,12 @@ for file in "${CRITICAL_FILES[@]}"; do
         echo "ERROR: www-data cannot read: $file"
         exit 1
     fi
-done
+}
+
+check_file "/data/httpboot/boot.ipxe"
+check_file "/data/httpboot/latest/ipxe.efi"
+check_file "/data/httpboot/latest/ipxe.efi.cfg"
+check_file "/data/httpboot/latest/EFI/BOOT/BOOTX64.EFI"
 
 # Verify boot.ipxe content
 echo "Verifying boot.ipxe content..."
