@@ -99,10 +99,30 @@ EOL
     echo "dnsmasq configuration generated successfully"
 }
 
+# Function to set up directory structure and permissions
+setup_directories() {
+    echo "Setting up directory structure and permissions..."
+    
+    # Create required directories with proper permissions
+    mkdir -p /data/httpboot /data/downloads /tftpboot
+    
+    # Set ownership and permissions for directories
+    chown -R www-data:www-data /data/httpboot
+    chmod 755 /data/httpboot
+    
+    chown -R dnsmasq:dnsmasq /tftpboot
+    chmod 755 /tftpboot
+    
+    chown -R www-data:www-data /data/downloads
+    chmod 755 /data/downloads
+}
+
 # Function to set up EVE-OS versions
 setup_eve_versions() {
     echo "Setting up EVE-OS versions..."
-    mkdir -p /data/httpboot /data/downloads /tftpboot
+    
+    # Ensure directories exist
+    setup_directories
 
     OLD_IFS=$IFS
     IFS=','
@@ -117,6 +137,11 @@ setup_eve_versions() {
             mkdir -p "/data/httpboot/${version}"
             tar -xf "/data/downloads/netboot-${version}.tar" -C "/data/httpboot/${version}/"
             rm "/data/downloads/netboot-${version}.tar"
+            
+            # Set proper permissions for extracted files
+            chown -R www-data:www-data "/data/httpboot/${version}"
+            find "/data/httpboot/${version}" -type f -exec chmod 644 {} \;
+            find "/data/httpboot/${version}" -type d -exec chmod 755 {} \;
         else
             echo "Version ${version} found in cache"
         fi
@@ -126,6 +151,11 @@ setup_eve_versions() {
             DEFAULT_VERSION=$version
             echo "Setting ${version} as default version"
             cp "/data/httpboot/${DEFAULT_VERSION}/ipxe.efi" /tftpboot/ipxe.efi
+            chown dnsmasq:dnsmasq /tftpboot/ipxe.efi
+            chmod 644 /tftpboot/ipxe.efi
+            
+            # Create 'latest' symlink
+            ln -sf "${DEFAULT_VERSION}" /data/httpboot/latest
         fi
 
         # Update ipxe.efi.cfg with correct URL
@@ -172,7 +202,23 @@ done
     IFS=$OLD_IFS
 }
 
-# Function to generate iPXE boot menu
+# Function to set file permissions
+set_file_permissions() {
+    echo "Setting final file permissions..."
+    
+    # Set permissions for boot menu and configuration files
+    chown www-data:www-data /data/httpboot/boot.ipxe
+    chmod 644 /data/httpboot/boot.ipxe
+    
+    find /data/httpboot -name "ipxe.efi.cfg" -exec chown www-data:www-data {} \;
+    find /data/httpboot -name "ipxe.efi.cfg" -exec chmod 644 {} \;
+    
+    # Set permissions for TFTP files
+    find /tftpboot -type f -exec chown dnsmasq:dnsmasq {} \;
+    find /tftpboot -type f -exec chmod 644 {} \;
+}
+
+# Function to generate boot menu
 generate_boot_menu() {
     echo "Generating iPXE boot menu..."
 
@@ -257,6 +303,9 @@ if [ ! -f "/tftpboot/undionly.kpxe" ]; then
     echo "Downloading undionly.kpxe..."
     curl -L -o /tftpboot/undionly.kpxe "https://boot.ipxe.org/undionly.kpxe"
 fi
+
+# 5. Set final permissions
+set_file_permissions
 
 # 6. Start services
 echo "Starting services..."
