@@ -38,7 +38,7 @@ for file in "${CRITICAL_FILES[@]}"; do
         exit 1
     fi
 
-    if ! sudo -u www-data test -r "$file"; then
+    if ! su -s /bin/sh www-data -c "test -r \"$file\""; then
         echo "ERROR: www-data cannot read: $file"
         exit 1
     fi
