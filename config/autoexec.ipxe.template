@@ -28,20 +28,30 @@ echo DNS: ${net0/dns}
 echo Next server: ${next-server}
 
 # Configure boot server
-set boot-url http://{{SERVER_IP}}
-echo Using boot server: ${boot-url}
+set next-server {{SERVER_IP}}
+set boot-url http://${next-server}
+echo Using boot server: ${boot-url} (${next-server})
 
 # Validate network configuration
 iseq ${net0/ip} 0.0.0.0 && echo Invalid IP configuration && goto retry_dhcp ||
 iseq ${net0/netmask} 0.0.0.0 && echo Invalid network mask && goto retry_dhcp ||
 iseq ${net0/gateway} 0.0.0.0 && echo Invalid gateway && goto retry_dhcp ||
 
+# Print full network status
+echo Full Network Status:
+echo   IP: ${net0/ip}
+echo   Netmask: ${net0/netmask}
+echo   Gateway: ${net0/gateway}
+echo   DNS: ${net0/dns}
+echo   Next-Server: ${next-server}
+echo   Boot-URL: ${boot-url}
+
 echo Network validation successful. Proceeding with boot...
 
 # Chain to main boot configuration
 echo Chaining to boot menu...
 echo Attempting to load ${boot-url}/boot.ipxe
-chain --autofree ${boot-url}/boot.ipxe || goto error
+chain --replace --autofree ${boot-url}/boot.ipxe || goto error
 
 :error
 echo Boot failed!
