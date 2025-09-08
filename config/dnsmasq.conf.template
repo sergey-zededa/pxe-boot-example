@@ -1,0 +1,50 @@
+# Base Configuration
+port=0
+interface={{LISTEN_INTERFACE}}
+bind-interfaces
+log-dhcp
+
+# TFTP configuration
+enable-tftp
+tftp-root=/tftpboot
+
+# Set next-server explicitly
+dhcp-option=option:tftp-server,{{SERVER_IP}}
+
+# PXE/iPXE detection and boot configuration
+dhcp-match=set:ipxe,175
+dhcp-match=set:ipxe-ok,option:user-class,iPXE
+
+{{#if STANDALONE_MODE}}
+# Standalone DHCP Configuration
+dhcp-range={{DHCP_RANGE_START}},{{DHCP_RANGE_END}},{{DHCP_SUBNET_MASK}},12h
+dhcp-option=option:router,{{DHCP_ROUTER}}
+{{else}}
+# Proxy DHCP Configuration
+dhcp-range={{NETWORK_ADDRESS}},proxy,{{DHCP_SUBNET_MASK}}
+{{#if PRIMARY_DHCP_IP}}
+dhcp-relay={{PRIMARY_DHCP_IP}}
+{{/if}}
+{{/if}}
+
+# Set HTTP server for iPXE clients
+dhcp-option=tag:ipxe,option:bootfile-name,http://{{SERVER_IP}}/{{DEFAULT_VERSION}}/ipxe.efi.cfg
+
+# Set TFTP server for non-iPXE clients
+dhcp-option=tag:!ipxe,option:bootfile-name,ipxe.efi
+
+{{#if DHCP_DOMAIN_NAME}}
+# Domain name configuration
+domain={{DHCP_DOMAIN_NAME}}
+{{/if}}
+
+{{#if DHCP_BROADCAST_ADDRESS}}
+# Broadcast address configuration
+dhcp-option=28,{{DHCP_BROADCAST_ADDRESS}}
+{{/if}}
+
+{{#if DEBUG}}
+# Debug logging
+log-queries
+log-dhcp
+{{/if}}
