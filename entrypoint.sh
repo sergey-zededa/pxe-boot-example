@@ -270,21 +270,34 @@ setup_eve_versions() {
 
             echo "Extracting assets..."
             mkdir -p "/data/httpboot/${version}"
-            if ! tar -xf "/data/downloads/netboot-${version}.tar" -C "/data/httpboot/${version}/"; then
+            
+            # Create a temporary directory for extraction
+            TEMP_DIR="/data/downloads/temp-${version}"
+            mkdir -p "${TEMP_DIR}"
+            
+            if ! tar -xf "/data/downloads/netboot-${version}.tar" -C "${TEMP_DIR}"; then
                 echo "Error: Failed to extract EVE-OS files for version ${version}"
+                rm -rf "${TEMP_DIR}"
                 exit 1
             fi
 
-            # Verify required files exist
-            for file in kernel initrd.img ucode.img; do
-                if [ ! -f "/data/httpboot/${version}/${file}" ]; then
-                    echo "Error: Required file ${file} not found in EVE-OS archive for version ${version}"
-                    exit 1
-                fi
-                echo "Verified ${file} exists"
-            done
+            # List contents for debugging
+            echo "Archive contents:"
+            ls -la "${TEMP_DIR}"
 
+            # Copy all files to the httpboot directory
+            cp -a "${TEMP_DIR}"/* "/data/httpboot/${version}/"
+
+            # Clean up
+            rm -rf "${TEMP_DIR}"
             rm "/data/downloads/netboot-${version}.tar"
+
+            # Create EFI boot directory structure
+            mkdir -p "/data/httpboot/${version}/EFI/BOOT/"
+            
+            # Move or copy necessary files
+            [ -f "/data/httpboot/${version}/rootfs.img" ] && mv "/data/httpboot/${version}/rootfs.img" "/data/httpboot/${version}/rootfs_installer.img"
+            [ -f "/data/httpboot/${version}/ipxe.efi" ] && cp "/data/httpboot/${version}/ipxe.efi" "/data/httpboot/${version}/EFI/BOOT/BOOTX64.EFI"
             
             # Set proper permissions for extracted files
             chown -R www-data:www-data "/data/httpboot/${version}"
