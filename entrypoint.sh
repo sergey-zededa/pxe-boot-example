@@ -386,9 +386,27 @@ setup_eve_versions() {
             chown dnsmasq:dnsmasq /tftpboot/ipxe.efi
             chmod 644 /tftpboot/ipxe.efi
             
-            # Create latest symlink
-            (cd /data/httpboot && rm -f latest && ln -sf "${DEFAULT_VERSION}" latest)
-            echo "Created 'latest' symlink to ${DEFAULT_VERSION}"
+            # Create 'latest' as a full copy
+            echo "Creating 'latest' directory with files from ${version}..."
+            rm -rf "/data/httpboot/latest"
+            cp -r "/data/httpboot/${version}" "/data/httpboot/latest"
+            
+            # Ensure 'latest' has correct permissions
+            chown -R www-data:www-data "/data/httpboot/latest"
+            find "/data/httpboot/latest" -type f -exec chmod 644 {} \;
+            find "/data/httpboot/latest" -type d -exec chmod 755 {} \;
+            
+            echo "Created and configured 'latest' directory"
+            
+            # Verify latest directory
+            echo "\nVerifying 'latest' directory structure:"
+            ls -laR "/data/httpboot/latest/" || echo "Failed to list 'latest' directory"
+            
+            if [ -f "/data/httpboot/latest/EFI/BOOT/BOOTX64.EFI" ]; then
+                echo "✓ BOOTX64.EFI is present in 'latest' directory"
+            else
+                echo "✗ WARNING: BOOTX64.EFI is missing from 'latest' directory!"
+            fi
             
             # Create 'latest' symlink
             ln -sf "${DEFAULT_VERSION}" /data/httpboot/latest
