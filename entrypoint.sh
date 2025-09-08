@@ -324,6 +324,10 @@ setup_eve_versions() {
             rm -rf "${TEMP_DIR}"
             rm "/data/downloads/netboot-${version}.tar"
             
+            # Debug - show what files we have before rename
+            echo "\nInitial files for version ${version}:"
+            ls -laR "/data/httpboot/${version}/" || echo "Failed to list directory"
+
             # Rename rootfs.img if it exists
             [ -f "/data/httpboot/${version}/rootfs.img" ] && mv "/data/httpboot/${version}/rootfs.img" "/data/httpboot/${version}/rootfs_installer.img"
             
@@ -332,17 +336,38 @@ setup_eve_versions() {
             find "/data/httpboot/${version}" -type f -exec chmod 644 {} \;
             find "/data/httpboot/${version}" -type d -exec chmod 755 {} \;
 
-            echo "\nFiles extracted and permissions set for version ${version}"
-            echo "Verifying file structure for ${version}:"
-            echo "Root directory:"
-            ls -la "/data/httpboot/${version}/"
-            echo "\nEFI directory structure:"
-            find "/data/httpboot/${version}/EFI" -type f -ls 2>/dev/null || echo "No EFI files found!"
-            
-            if [ ! -f "/data/httpboot/${version}/EFI/BOOT/BOOTX64.EFI" ]; then
-                echo "\nWARNING: BOOTX64.EFI is missing for version ${version}!"
+            echo "\nVerifying file structure after permission updates:"
+            echo "Files for version ${version}:"
+            ls -laR "/data/httpboot/${version}/" || echo "Failed to list directory"
+
+            # Check for BOOTX64.EFI and handle ISO if needed
+            if [ ! -f "/data/httpboot/${version}/EFI/BOOT/BOOTX64.EFI" ] && [ -f "/data/httpboot/${version}/installer.iso" ]; then
+                echo "\nBOOTX64.EFI not found but installer.iso exists. Attempting extraction..."
+                ISO_EXTRACT_DIR="/tmp/iso-${version}"
+                mkdir -p "${ISO_EXTRACT_DIR}"
+                if 7z x "/data/httpboot/${version}/installer.iso" -o"${ISO_EXTRACT_DIR}" EFI/BOOT/BOOTX64.EFI; then
+                    if [ -f "${ISO_EXTRACT_DIR}/EFI/BOOT/BOOTX64.EFI" ]; then
+                        echo "Found BOOTX64.EFI in ISO, copying to target location..."
+                        mkdir -p "/data/httpboot/${version}/EFI/BOOT"
+                        cp "${ISO_EXTRACT_DIR}/EFI/BOOT/BOOTX64.EFI" "/data/httpboot/${version}/EFI/BOOT/"
+                        chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/BOOTX64.EFI"
+                        chmod 644 "/data/httpboot/${version}/EFI/BOOT/BOOTX64.EFI"
+                    else
+                        echo "ERROR: BOOTX64.EFI not found in extracted ISO content"
+                    fi
+                else
+                    echo "ERROR: Failed to extract BOOTX64.EFI from ISO"
+                fi
+                rm -rf "${ISO_EXTRACT_DIR}"
+            fi
+
+            # Final verification
+            echo "\nFinal file structure verification for ${version}:"
+            if [ -f "/data/httpboot/${version}/EFI/BOOT/BOOTX64.EFI" ]; then
+                echo "✓ BOOTX64.EFI is present and accessible"
+                ls -l "/data/httpboot/${version}/EFI/BOOT/BOOTX64.EFI"
             else
-                echo "\nBOOTX64.EFI is present for version ${version}"
+                echo "✗ WARNING: BOOTX64.EFI is missing!"
             fi
             
             # Set proper permissions for extracted files
