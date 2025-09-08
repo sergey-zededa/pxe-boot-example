@@ -893,9 +893,15 @@ check_file "/data/httpboot/latest/EFI/BOOT/BOOTX64.EFI"
 
 # Verify boot.ipxe content
 echo "Verifying boot.ipxe content..."
-if ! grep -q "chain --autofree" /data/httpboot/boot.ipxe; then
+if ! grep -q "chain --replace --autofree" /data/httpboot/boot.ipxe || \
+   ! grep -q "menu EVE-OS Boot Menu" /data/httpboot/boot.ipxe || \
+   ! grep -q "#!ipxe" /data/httpboot/boot.ipxe; then
     echo "ERROR: boot.ipxe appears to be invalid"
-    echo "Content:"
+    echo "Missing one or more required elements:"
+    echo "  - #!ipxe header"
+    echo "  - menu EVE-OS Boot Menu"
+    echo "  - chain --replace --autofree command"
+    echo "\nCurrent content:"
     cat /data/httpboot/boot.ipxe
     exit 1
 fi
