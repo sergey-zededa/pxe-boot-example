@@ -218,6 +218,21 @@ set_file_permissions() {
     find /tftpboot -type f -exec chmod 644 {} \;
 }
 
+# Function to generate version-specific iPXE config
+generate_version_config() {
+    local version=$1
+    echo "Generating iPXE config for version ${version}..."
+
+    # Create version directory if it doesn't exist
+    mkdir -p "/data/httpboot/${version}"
+
+    # Generate version-specific ipxe.efi.cfg from template
+    sed "s/{{SERVER_IP}}/${SERVER_IP}/g; s/{{VERSION}}/${version}/g" \
+        /config/ipxe.efi.cfg.template > "/data/httpboot/${version}/ipxe.efi.cfg"
+
+    echo "Generated iPXE config for version ${version}"
+}
+
 # Function to generate boot menu
 generate_boot_menu() {
     echo "Generating iPXE boot menu..."
@@ -226,9 +241,12 @@ generate_boot_menu() {
     cat > /data/httpboot/boot.ipxe <<EOL
 #!ipxe
 
-:start
-menu EVE-OS Version Selection
+# Enable debugging
+set debug all
 
+:start
+menu EVE-OS Boot Menu
+item --gap -- EVE-OS Versions:
 EOL
 
     # Add menu items for each version
@@ -236,20 +254,34 @@ EOL
     OLD_IFS=$IFS
     IFS=','
     for version in $EVE_VERSIONS; do
-        echo "item eve_${item_num} Install EVE-OS ${version}" >> /data/httpboot/boot.ipxe
+        echo "item eve_${item_num} EVE-OS ${version}" >> /data/httpboot/boot.ipxe
+        generate_version_config "${version}"
         item_num=$((item_num+1))
     done
     IFS=$OLD_IFS
 
-    # Add menu footer and default selection
+    # Add menu footer and options
     cat >> /data/httpboot/boot.ipxe <<EOL
 
-item --gap -- ------------------------------------------
+item --gap
+item --gap -- Tools:
 item shell Drop to iPXE shell
-item reboot Reboot computer
+item reboot Reboot system
+item retry Retry network configuration
+item
+item --gap -- ------------------------------------------
+item --gap Version information:
+item --gap Selected version will boot in ${BOOT_MENU_TIMEOUT} seconds
+item --gap Server IP: ${SERVER_IP}
 
-choose --timeout ${BOOT_MENU_TIMEOUT}000 --default eve_1 selected || goto start
+choose --timeout ${BOOT_MENU_TIMEOUT}000 --default eve_1 selected || goto menu_error
 goto \${selected}
+
+:menu_error
+echo Menu selection failed
+echo Error: \${errno}
+prompt --timeout 5000 Press any key to retry or wait 5 seconds...
+goto start
 EOL
 
     # Add menu handlers for each version
@@ -257,8 +289,23 @@ EOL
     OLD_IFS=$IFS
     IFS=','
     for version in $EVE_VERSIONS; do
-        echo ":eve_${item_num}" >> /data/httpboot/boot.ipxe
-        echo "chain http://${SERVER_IP}/${version}/ipxe.efi.cfg || goto failed" >> /data/httpboot/boot.ipxe
+        cat >> /data/httpboot/boot.ipxe <<EOL
+
+:eve_${item_num}
+echo Loading EVE-OS ${version}...
+chain --replace --autofree http://${SERVER_IP}/${version}/ipxe.efi.cfg || goto chain_error
+
+:chain_error
+echo Chain load failed for EVE-OS ${version}
+echo Error: \${errno}
+echo Common error codes:
+echo 1 - File not found
+echo 2 - Access denied
+echo 3 - Disk error
+echo 4 - Network error
+prompt --timeout 5000 Press any key to return to menu or wait 5 seconds...
+goto start
+EOL
         item_num=$((item_num+1))
     done
     IFS=$OLD_IFS
@@ -267,15 +314,23 @@ EOL
     cat >> /data/httpboot/boot.ipxe <<EOL
 
 :shell
+echo Dropping to iPXE shell...
 shell
 goto start
 
 :reboot
+echo Rebooting system...
 reboot
 
-:failed
-echo Boot failed, returning to menu in 5 seconds...
-sleep 5
+:retry
+echo Retrying network configuration...
+dhcp || goto retry_error
+goto start
+
+:retry_error
+echo DHCP configuration failed
+echo Error: \${errno}
+prompt --timeout 5000 Press any key to return to menu or wait 5 seconds...
 goto start
 EOL
 

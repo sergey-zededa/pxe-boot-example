@@ -1,0 +1,57 @@
+#!ipxe
+
+# Enable debugging
+set debug all
+
+# Network configuration
+:start
+echo Configuring network...
+dhcp || goto retry_dhcp
+
+:retry_dhcp
+echo DHCP configuration failed. Retrying in 3 seconds...
+sleep 3
+dhcp || goto retry_dhcp_fail
+goto check_config
+
+:retry_dhcp_fail
+echo Maximum DHCP retries exceeded. Press any key to retry...
+prompt --timeout 10000 Press any key to retry DHCP configuration, or wait 10 seconds for automatic retry
+goto start
+
+:check_config
+echo Network configured successfully:
+echo IP: ${net0/ip}
+echo Netmask: ${net0/netmask}
+echo Gateway: ${net0/gateway}
+echo DNS: ${net0/dns}
+echo Next server: ${next-server}
+
+# Configure boot server
+set boot-url http://{{SERVER_IP}}
+echo Using boot server: ${boot-url}
+
+# Validate network configuration
+iseq ${net0/ip} 0.0.0.0 && echo Invalid IP configuration && goto retry_dhcp ||
+iseq ${net0/netmask} 0.0.0.0 && echo Invalid network mask && goto retry_dhcp ||
+iseq ${net0/gateway} 0.0.0.0 && echo Invalid gateway && goto retry_dhcp ||
+
+echo Network validation successful. Proceeding with boot...
+
+# Chain to main boot configuration
+echo Chaining to boot menu...
+chain --autofree --replace ${boot-url}/latest/ipxe.efi.cfg ||
+
+:error
+echo Boot failed!
+echo Error code: ${errno}
+echo Error message: ${errstr}
+echo
+echo Common error codes:
+echo 1 - File not found
+echo 2 - Access denied
+echo 3 - Disk error
+echo 4 - Network error
+
+prompt --timeout 10000 Press any key to retry, or wait 10 seconds for automatic retry
+goto start

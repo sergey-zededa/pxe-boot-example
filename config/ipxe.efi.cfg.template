@@ -1,0 +1,65 @@
+#!ipxe
+
+# Enable debugging
+set debug all
+
+# Force our server address
+set next-server {{SERVER_IP}}
+set boot-url http://${next-server}/{{VERSION}}
+
+echo iPXE boot starting...
+echo Server: ${next-server}
+echo Boot URL: ${boot-url}
+
+# Set default console parameters
+set console console=ttyS0,115200n8 console=ttyS1,115200n8 console=ttyS2,115200n8 console=ttyAMA0,115200n8 console=ttyAMA1,115200n8 console=tty0
+set eve_args eve_soft_serial=${mac:hexhyp} eve_reboot_after_install getty
+set installer_args root=/initrd.image find_boot=netboot overlaytmpfs fastboot
+
+# Detect platform and apply specific settings
+iseq ${smbios/manufacturer} Huawei && goto huawei ||
+iseq ${smbios/manufacturer} Supermicro && goto supermicro ||
+iseq ${smbios/manufacturer} QEMU && goto qemu ||
+goto generic
+
+:huawei
+set console console=ttyAMA0,115200n8
+set platform_tweaks pcie_aspm=off pci=pcie_bus_perf
+goto boot
+
+:supermicro
+set console console=ttyS1,115200n8
+goto boot
+
+:qemu
+set console console=hvc0 console=ttyS0
+goto boot
+
+:generic
+echo No specific platform tweaks needed
+goto boot
+
+:boot
+echo Loading EVE-OS installer components...
+
+# Load kernel with error handling
+echo Loading kernel...
+kernel ${boot-url}/kernel ${console} ${eve_args} ${installer_args} ${platform_tweaks} || goto error
+
+echo Loading microcode...
+initrd ${boot-url}/ucode.img || goto error
+
+echo Loading initial ramdisk...
+initrd ${boot-url}/initrd.img || goto error
+
+echo Loading EVE-OS installer image...
+initrd ${boot-url}/rootfs_installer.img || goto error
+
+echo Starting EVE-OS installer...
+boot
+
+:error
+echo Boot failed! Error: ${errno}
+echo Message: ${errstr}
+prompt Press any key to retry...
+chain ${boot-url}/ipxe.efi.cfg

@@ -27,8 +27,10 @@ RUN mkdir -p /tftpboot /data/httpboot /data/downloads /run/nginx && \
 
 # 4. Copy configuration and scripts
 COPY config/nginx.conf /etc/nginx/nginx.conf
+COPY config/*.template /config/
 COPY entrypoint.sh /entrypoint.sh
 RUN dos2unix /entrypoint.sh && \
+    dos2unix /config/*.template && \
     chmod +x /entrypoint.sh
 
 # 5. Expose ports and declare data volume
