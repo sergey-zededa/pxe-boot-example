@@ -514,41 +514,108 @@ generate_version_config() {
 generate_boot_menu() {
     echo "Generating iPXE boot menu..."
     
-    # Build menu items
-    local menu_items=""
-    local menu_handlers=""
+    # Create initial menu file
+    cat > /data/httpboot/boot.ipxe <<EOF
+#!ipxe
+
+# Enable debugging
+set debug all
+
+:start
+menu EVE-OS Boot Menu
+item --gap -- Available versions:
+EOF
+    
+    # Add menu items
     item_num=1
     OLD_IFS=$IFS
     IFS=','
     for version in $EVE_VERSIONS; do
-        menu_items="${menu_items}item eve_${item_num} EVE-OS ${version}\n"
-        
-        # Build handler for this version
-        menu_handlers="${menu_handlers}\n:eve_${item_num}\n"
-        menu_handlers="${menu_handlers}echo Loading EVE-OS ${version}...\n"
-        menu_handlers="${menu_handlers}chain --replace --autofree http://${SERVER_IP}/${version}/ipxe.efi.cfg || goto chain_error\n\n"
-        menu_handlers="${menu_handlers}:chain_error\n"
-        menu_handlers="${menu_handlers}echo Chain load failed for EVE-OS ${version}\n"
-        menu_handlers="${menu_handlers}echo Error: \\${errno}\n"
-        menu_handlers="${menu_handlers}echo Common error codes:\n"
-        menu_handlers="${menu_handlers}echo 1 - File not found\n"
-        menu_handlers="${menu_handlers}echo 2 - Access denied\n"
-        menu_handlers="${menu_handlers}echo 3 - Disk error\n"
-        menu_handlers="${menu_handlers}echo 4 - Network error\n"
-        menu_handlers="${menu_handlers}prompt --timeout 5000 Press any key to return to menu or wait 5 seconds...\n"
-        menu_handlers="${menu_handlers}goto start\n"
-        
+        echo "item eve_${item_num} EVE-OS ${version}" >> /data/httpboot/boot.ipxe
         generate_version_config "${version}"
         item_num=$((item_num+1))
     done
     IFS=$OLD_IFS
     
-    # Create boot menu from template
-    sed -e "s|{{menu_items}}|${menu_items}|g" \
-        -e "s|{{menu_handlers}}|${menu_handlers}|g" \
-        -e "s|{{timeout}}|${BOOT_MENU_TIMEOUT}|g" \
-        -e "s|{{server_ip}}|${SERVER_IP}|g" \
-        /config/boot.ipxe.template > /data/httpboot/boot.ipxe
+    # Add menu footer
+    cat >> /data/httpboot/boot.ipxe <<EOF
+
+item
+item --gap -- Tools:
+item shell Drop to iPXE shell
+item reboot Reboot system
+item retry Retry network configuration
+item
+item --gap -- --------------------------------------------
+item --gap Version information:
+item --gap Selected version will boot in ${BOOT_MENU_TIMEOUT} seconds
+item --gap Server IP: ${SERVER_IP}
+
+choose --timeout ${BOOT_MENU_TIMEOUT}000 --default eve_1 selected || goto menu_error
+goto \${selected}
+
+:menu_error
+echo Menu selection failed
+echo Error: \${errno}
+prompt --timeout 5000 Press any key to retry or wait 5 seconds...
+goto start
+EOF
+
+    # Add menu handlers
+    item_num=1
+    OLD_IFS=$IFS
+    IFS=','
+    for version in $EVE_VERSIONS; do
+        cat >> /data/httpboot/boot.ipxe <<EOF
+
+:eve_${item_num}
+echo Loading EVE-OS ${version}...
+chain --replace --autofree http://${SERVER_IP}/${version}/ipxe.efi.cfg || goto chain_error
+
+:chain_error
+echo Chain load failed for EVE-OS ${version}
+echo Error: \${errno}
+echo Common error codes:
+echo 1 - File not found
+echo 2 - Access denied
+echo 3 - Disk error
+echo 4 - Network error
+prompt --timeout 5000 Press any key to return to menu or wait 5 seconds...
+goto start
+EOF
+        item_num=$((item_num+1))
+    done
+    IFS=$OLD_IFS
+
+    # Add utility handlers
+    cat >> /data/httpboot/boot.ipxe <<EOF
+
+:shell
+echo Dropping to iPXE shell...
+shell
+goto start
+
+:reboot
+echo Rebooting system...
+reboot
+
+:retry
+echo Retrying network configuration...
+dhcp || goto retry_error
+goto start
+
+:retry_error
+echo DHCP configuration failed
+echo Error: \${errno}
+prompt --timeout 5000 Press any key to return to menu or wait 5 seconds...
+goto start
+EOF
+
+    # Set permissions
+    chmod 644 /data/httpboot/boot.ipxe
+    chown www-data:www-data /data/httpboot/boot.ipxe
+    
+    echo "Boot menu generated successfully"
     
     # Set permissions
     chmod 644 /data/httpboot/boot.ipxe
