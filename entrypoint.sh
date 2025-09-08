@@ -627,7 +627,10 @@ validate_environment
 # 2. Set up EVE-OS versions and assets
 setup_eve_versions
 
-# 3. Generate boot menu
+# Source iPXE configuration functions
+source /app/scripts/generate_ipxe_config.sh
+
+# Generate iPXE boot menu
 generate_boot_menu
 
 # 4. Configure boot files
