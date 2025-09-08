@@ -198,20 +198,15 @@ log-dhcp
 enable-tftp
 tftp-root=/tftpboot
 
-# Set next-server explicitly
-dhcp-option=option:tftp-server,${SERVER_IP}
-
 # Client Detection
 dhcp-match=set:ipxe,175
 dhcp-match=set:ipxe-ok,option:user-class,iPXE
 dhcp-match=set:efi64,option:client-arch,7
 dhcp-match=set:efi64,option:client-arch,9
 
-# Non-iPXE UEFI clients get iPXE binary
-dhcp-boot=tag:!ipxe,tag:efi64,ipxe.efi,,${SERVER_IP}
-
-# iPXE clients get HTTP URL directly
-dhcp-option=tag:ipxe,option:bootfile-name,http://${SERVER_IP}/boot.ipxe
+# TFTP server configuration
+dhcp-boot=tag:!ipxe,tag:efi64,ipxe.efi,${SERVER_IP},${SERVER_IP}
+dhcp-boot=tag:ipxe,boot.ipxe,${SERVER_IP},${SERVER_IP}
 EOL
 
     # DHCP Mode-specific configuration
