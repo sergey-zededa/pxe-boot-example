@@ -2,19 +2,97 @@
 # Exit on any error
 set -e
 
+# Function to print usage information
+print_usage() {
+    cat << EOF
+Usage: docker run [options] ipxe-server:latest
+
+Required Environment Variables:
+  EVE_VERSIONS          Comma-separated list of EVE-OS versions (e.g. "14.5.1-lts,13.10.0")
+  SERVER_IP             IP address of the server (e.g. "192.168.1.50")
+  LISTEN_INTERFACE      Network interface to listen on (e.g. "eth0")
+
+DHCP Mode Configuration:
+  DHCP_MODE            Either "proxy" or "standalone" (default: "proxy")
+
+Standalone DHCP Mode Variables:
+  DHCP_RANGE_START     Start of IP range to lease (required in standalone mode)
+  DHCP_RANGE_END       End of IP range to lease (required in standalone mode)
+  DHCP_ROUTER          Gateway IP address (required in standalone mode)
+  DHCP_SUBNET_MASK     Subnet mask (default: "255.255.255.0")
+
+Proxy DHCP Mode Variables:
+  PRIMARY_DHCP_IP      IP address of primary DHCP server (optional)
+
+Optional Configuration:
+  BOOT_MENU_TIMEOUT    Timeout in seconds for boot menu (default: 15)
+  LOG_LEVEL            Set to "debug" for verbose logging (default: "info")
+  DHCP_DOMAIN_NAME     Domain name for DHCP clients
+  DHCP_BROADCAST_ADDRESS Broadcast address for the network
+
+Example:
+  docker run -d --net=host --privileged \
+    -v ./ipxe_data:/data \
+    -e EVE_VERSIONS="14.5.1-lts,13.10.0" \
+    -e SERVER_IP="192.168.1.50" \
+    -e LISTEN_INTERFACE="eth0" \
+    -e DHCP_MODE="standalone" \
+    -e DHCP_RANGE_START="192.168.1.100" \
+    -e DHCP_RANGE_END="192.168.1.150" \
+    -e DHCP_ROUTER="192.168.1.1" \
+    ipxe-server:latest
+EOF
+}
+
+# Function to validate IP address format
+validate_ip() {
+    local ip=$1
+    local name=$2
+    if ! echo "$ip" | grep -E '^([0-9]{1,3}\.){3}[0-9]{1,3}$' >/dev/null; then
+        echo "Error: Invalid IP address format for $name: $ip"
+        return 1
+    fi
+    for octet in $(echo "$ip" | tr '.' ' '); do
+        if [ "$octet" -lt 0 ] || [ "$octet" -gt 255 ]; then
+            echo "Error: Invalid IP address format for $name: $ip"
+            return 1
+        fi
+    done
+    return 0
+}
+
+# Function to validate EVE versions format
+validate_eve_versions() {
+    local versions=$1
+    if ! echo "$versions" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?(,[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?)*$' >/dev/null; then
+        echo "Error: Invalid EVE_VERSIONS format. Expected format: X.Y.Z-suffix[,X.Y.Z-suffix,...]"
+        return 1
+    fi
+    return 0
+}
+
 # Function to validate required environment variables
 validate_environment() {
+    local has_error=0
+
+    # Check required variables
     if [ -z "$EVE_VERSIONS" ]; then
-        echo "Error: EVE_VERSIONS is required. Example: EVE_VERSIONS=\"14.5.1-lts,13.10.0\""
-        exit 1
+        echo "Error: EVE_VERSIONS is required"
+        has_error=1
+    else
+        validate_eve_versions "$EVE_VERSIONS" || has_error=1
     fi
+
     if [ -z "$SERVER_IP" ]; then
-        echo "Error: SERVER_IP is required."
-        exit 1
+        echo "Error: SERVER_IP is required"
+        has_error=1
+    else
+        validate_ip "$SERVER_IP" "SERVER_IP" || has_error=1
     fi
+
     if [ -z "$LISTEN_INTERFACE" ]; then
-        echo "Error: LISTEN_INTERFACE is required (e.g. eth0)."
-        exit 1
+        echo "Error: LISTEN_INTERFACE is required"
+        has_error=1
     fi
 
     # Set defaults for optional variables
@@ -23,9 +101,62 @@ validate_environment() {
     DHCP_MODE=${DHCP_MODE:="proxy"}
     DHCP_SUBNET_MASK=${DHCP_SUBNET_MASK:="255.255.255.0"}
 
-    echo "iPXE Server IP: ${SERVER_IP}"
-    echo "Interface: ${LISTEN_INTERFACE}"
-    echo "DHCP Mode: ${DHCP_MODE}"
+    # Validate DHCP mode-specific configuration
+    case "$DHCP_MODE" in
+        standalone)
+            if [ -z "$DHCP_RANGE_START" ] || [ -z "$DHCP_RANGE_END" ] || [ -z "$DHCP_ROUTER" ]; then
+                echo "Error: standalone mode requires DHCP_RANGE_START, DHCP_RANGE_END, and DHCP_ROUTER"
+                has_error=1
+            else
+                validate_ip "$DHCP_RANGE_START" "DHCP_RANGE_START" || has_error=1
+                validate_ip "$DHCP_RANGE_END" "DHCP_RANGE_END" || has_error=1
+                validate_ip "$DHCP_ROUTER" "DHCP_ROUTER" || has_error=1
+            fi
+            ;;
+        proxy)
+            if [ -n "$PRIMARY_DHCP_IP" ]; then
+                validate_ip "$PRIMARY_DHCP_IP" "PRIMARY_DHCP_IP" || has_error=1
+            fi
+            ;;
+        *)
+            echo "Error: DHCP_MODE must be either 'proxy' or 'standalone'"
+            has_error=1
+            ;;
+    esac
+
+    # Validate optional IP addresses if provided
+    if [ -n "$DHCP_BROADCAST_ADDRESS" ]; then
+        validate_ip "$DHCP_BROADCAST_ADDRESS" "DHCP_BROADCAST_ADDRESS" || has_error=1
+    fi
+
+    # Validate numeric values
+    if ! echo "$BOOT_MENU_TIMEOUT" | grep -E '^[0-9]+$' >/dev/null; then
+        echo "Error: BOOT_MENU_TIMEOUT must be a positive integer"
+        has_error=1
+    fi
+
+    # Print configuration if validation passed
+    if [ "$has_error" -eq 0 ]; then
+        echo "Configuration:"
+        echo "  Server IP: ${SERVER_IP}"
+        echo "  Interface: ${LISTEN_INTERFACE}"
+        echo "  DHCP Mode: ${DHCP_MODE}"
+        echo "  Boot Menu Timeout: ${BOOT_MENU_TIMEOUT}s"
+        echo "  Log Level: ${LOG_LEVEL}"
+        [ -n "$DHCP_DOMAIN_NAME" ] && echo "  Domain Name: ${DHCP_DOMAIN_NAME}"
+        [ -n "$DHCP_BROADCAST_ADDRESS" ] && echo "  Broadcast Address: ${DHCP_BROADCAST_ADDRESS}"
+
+        if [ "$DHCP_MODE" = "standalone" ]; then
+            echo "  DHCP Range: ${DHCP_RANGE_START} - ${DHCP_RANGE_END}"
+            echo "  Router: ${DHCP_ROUTER}"
+            echo "  Subnet Mask: ${DHCP_SUBNET_MASK}"
+        elif [ -n "$PRIMARY_DHCP_IP" ]; then
+            echo "  Primary DHCP Server: ${PRIMARY_DHCP_IP}"
+        fi
+    else
+        print_usage
+        exit 1
+    fi
 }
 
 # Function to generate dnsmasq configuration
