@@ -421,9 +421,6 @@ fi
             else
                 echo "✗ WARNING: BOOTX64.EFI is missing from 'latest' directory!"
             fi
-            
-            # Create 'latest' symlink
-            ln -sf "${DEFAULT_VERSION}" /data/httpboot/latest
         fi
 
         # Update ipxe.efi.cfg with correct URL
