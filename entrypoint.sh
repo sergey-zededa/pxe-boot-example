@@ -294,21 +294,20 @@ setup_eve_versions() {
                 echo "Copying EFI boot files..."
                 cp -r "${TEMP_DIR}/EFI" "/data/httpboot/${version}/"
             elif [ -f "${TEMP_DIR}/installer.iso" ]; then
-                echo "Found installer.iso, mounting to extract EFI files..."
-                MOUNT_DIR="${TEMP_DIR}/mnt"
-                mkdir -p "${MOUNT_DIR}"
-                if mount -o loop "${TEMP_DIR}/installer.iso" "${MOUNT_DIR}"; then
-                    if [ -d "${MOUNT_DIR}/EFI/BOOT" ]; then
+                echo "Found installer.iso, extracting EFI files..."
+                ISO_EXTRACT_DIR="${TEMP_DIR}/iso"
+                mkdir -p "${ISO_EXTRACT_DIR}"
+                if 7z x "${TEMP_DIR}/installer.iso" -o"${ISO_EXTRACT_DIR}" EFI/BOOT/BOOTX64.EFI >/dev/null; then
+                    if [ -f "${ISO_EXTRACT_DIR}/EFI/BOOT/BOOTX64.EFI" ]; then
                         echo "Copying EFI files from ISO..."
-                        cp -r "${MOUNT_DIR}/EFI" "/data/httpboot/${version}/"
+                        cp -r "${ISO_EXTRACT_DIR}/EFI" "/data/httpboot/${version}/"
                     else
-                        echo "Warning: No EFI directory found in ISO"
+                        echo "Warning: No EFI/BOOT/BOOTX64.EFI found in ISO"
                     fi
-                    umount "${MOUNT_DIR}"
                 else
-                    echo "Warning: Failed to mount installer.iso"
+                    echo "Warning: Failed to extract files from installer.iso"
                 fi
-                rm -rf "${MOUNT_DIR}"
+                rm -rf "${ISO_EXTRACT_DIR}"
             else
                 echo "Warning: No EFI boot files found in archive"
             fi
@@ -333,12 +332,18 @@ setup_eve_versions() {
             find "/data/httpboot/${version}" -type f -exec chmod 644 {} \;
             find "/data/httpboot/${version}" -type d -exec chmod 755 {} \;
 
-            echo "Files extracted and permissions set for version ${version}"
+            echo "\nFiles extracted and permissions set for version ${version}"
             echo "Verifying file structure for ${version}:"
             echo "Root directory:"
             ls -la "/data/httpboot/${version}/"
-            echo "\nEFI directory:"
-            ls -la "/data/httpboot/${version}/EFI/BOOT/" || echo "EFI directory not found!"
+            echo "\nEFI directory structure:"
+            find "/data/httpboot/${version}/EFI" -type f -ls 2>/dev/null || echo "No EFI files found!"
+            
+            if [ ! -f "/data/httpboot/${version}/EFI/BOOT/BOOTX64.EFI" ]; then
+                echo "\nWARNING: BOOTX64.EFI is missing for version ${version}!"
+            else
+                echo "\nBOOTX64.EFI is present for version ${version}"
+            fi
             
             # Set proper permissions for extracted files
             chown -R www-data:www-data "/data/httpboot/${version}"

@@ -9,7 +9,7 @@ RUN apk add --no-cache \
     dos2unix \
     shadow \
     bash \
-    mount
+    p7zip
 
 # 2. Create users and groups
 RUN adduser -S -u 82 -D -H -h /var/www -s /sbin/nologin -G www-data -g www-data www-data
