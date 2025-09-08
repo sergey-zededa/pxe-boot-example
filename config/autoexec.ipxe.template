@@ -27,24 +27,28 @@ echo Gateway: ${net0/gateway}
 echo DNS: ${net0/dns}
 echo Next server: ${next-server}
 
-# Configure boot server
-set next-server {{SERVER_IP}}
-set boot-url http://${next-server}
-echo Using boot server: ${boot-url} (${next-server})
-
-# Validate network configuration
-iseq ${net0/ip} 0.0.0.0 && echo Invalid IP configuration && goto retry_dhcp ||
-iseq ${net0/netmask} 0.0.0.0 && echo Invalid network mask && goto retry_dhcp ||
-iseq ${net0/gateway} 0.0.0.0 && echo Invalid gateway && goto retry_dhcp ||
-
-# Print full network status
+# Print network status from DHCP
 echo Full Network Status:
 echo   IP: ${net0/ip}
 echo   Netmask: ${net0/netmask}
 echo   Gateway: ${net0/gateway}
 echo   DNS: ${net0/dns}
 echo   Next-Server: ${next-server}
-echo   Boot-URL: ${boot-url}
+
+# Validate network configuration
+iseq ${net0/ip} 0.0.0.0 && echo Invalid IP configuration && goto retry_dhcp ||
+iseq ${net0/netmask} 0.0.0.0 && echo Invalid network mask && goto retry_dhcp ||
+iseq ${net0/gateway} 0.0.0.0 && echo Invalid gateway && goto retry_dhcp ||
+
+# Configure boot server - use DHCP next-server if available, otherwise fallback to SERVER_IP
+set boot-server {{SERVER_IP}}
+set next-server ${next-server} || set next-server ${boot-server}
+set boot-url http://${next-server}
+
+echo Boot Configuration:
+echo   Boot Server: ${boot-server}
+echo   Next Server: ${next-server}
+echo   Boot URL: ${boot-url}
 
 echo Network validation successful. Proceeding with boot...
 

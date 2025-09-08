@@ -200,6 +200,8 @@ tftp-root=/tftpboot
 
 # Set next-server explicitly
 dhcp-option=option:tftp-server,${SERVER_IP}
+dhcp-option=option:bootfile-server,${SERVER_IP}
+dhcp-option=siaddr,${SERVER_IP}
 
 # Client Detection
 dhcp-match=set:ipxe,175
