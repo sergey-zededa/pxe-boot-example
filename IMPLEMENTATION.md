@@ -5,32 +5,32 @@ This document outlines the implementation plan for aligning the iPXE server conf
 ## Phase 1: Core Infrastructure
 
 ### Dockerfile Updates
-- [ ] Add www-data and dnsmasq users/groups
-- [ ] Install additional required packages
-- [ ] Set up proper directory permissions
-- [ ] Configure volume permissions
+- [x] Add www-data and dnsmasq users/groups
+- [x] Install additional required packages
+- [x] Set up proper directory permissions
+- [x] Configure volume permissions
 
 ### Directory Structure
-- [ ] Update /data/httpboot/ structure and permissions (755, www-data:www-data)
-- [ ] Update /tftpboot/ structure and permissions (755, dnsmasq:nogroup)
-- [ ] Set up file permissions:
-  - [ ] kernel, initrd.img, ucode.img (644, www-data:www-data)
-  - [ ] ipxe.efi.cfg (644, www-data:www-data)
-  - [ ] boot.ipxe (644, www-data:www-data)
-- [ ] Implement 'latest' symlink management
+- [x] Update /data/httpboot/ structure and permissions (755, www-data:www-data)
+- [x] Update /tftpboot/ structure and permissions (755, dnsmasq:nogroup)
+- [x] Set up file permissions:
+  - [x] kernel, initrd.img, ucode.img (644, www-data:www-data)
+  - [x] ipxe.efi.cfg (644, www-data:www-data)
+  - [x] boot.ipxe (644, www-data:www-data)
+- [x] Implement 'latest' symlink management
 
 ### Service Configurations
-- [ ] Update nginx.conf:
-  - [ ] Add MIME type handling for .ipxe and .efi files
-  - [ ] Configure default_server and IPv6 support
-  - [ ] Set up proper root directory and index settings
-  - [ ] Add specific location blocks
-  - [ ] Configure error handling and logging
-- [ ] Update dnsmasq configuration:
-  - [ ] Implement proxy and standalone mode handling
-  - [ ] Set up TFTP configuration
-  - [ ] Configure PXE/iPXE detection
-  - [ ] Set up DHCP options for boot stages
+- [x] Update nginx.conf:
+  - [x] Add MIME type handling for .ipxe and .efi files
+  - [x] Configure default_server and IPv6 support
+  - [x] Set up proper root directory and index settings
+  - [x] Add specific location blocks
+  - [x] Configure error handling and logging
+- [x] Update dnsmasq configuration:
+  - [x] Implement proxy and standalone mode handling
+  - [x] Set up TFTP configuration
+  - [x] Configure PXE/iPXE detection
+  - [x] Set up DHCP options for boot stages
 
 ## Phase 2: Boot Configuration
 
