@@ -159,9 +159,17 @@ validate_environment() {
     fi
 }
 
+# Function to generate autoexec.ipxe
+generate_autoexec() {
+    printf "Generating autoexec.ipxe...\n"
+    sed "s/{{SERVER_IP}}/${SERVER_IP}/g" /config/autoexec.ipxe.template > /tftpboot/autoexec.ipxe
+    chmod 644 /tftpboot/autoexec.ipxe
+    chown dnsmasq:dnsmasq /tftpboot/autoexec.ipxe
+}
+
 # Function to generate dnsmasq configuration
 generate_dnsmasq_conf() {
-    echo "Generating dnsmasq configuration..."
+    printf "Generating dnsmasq configuration...\n"
 
     # Create initial TFTP configuration that chains to HTTP
     cat > /tftpboot/ipxe.efi.cfg <<EOL
@@ -191,8 +199,8 @@ dhcp-match=set:efi64,option:client-arch,9
 dhcp-boot=tag:!ipxe,tag:efi64,ipxe.efi,,${SERVER_IP}
 pxe-service=tag:efi64,X86-64_EFI,"EVE-OS Network Boot",ipxe.efi
 
-# iPXE gets TFTP config that chains to HTTP
-dhcp-boot=tag:ipxe,ipxe.efi.cfg,,${SERVER_IP}
+# iPXE clients get HTTP config directly
+dhcp-option=tag:ipxe,option:bootfile-name,http://${SERVER_IP}/latest/ipxe.efi.cfg
 
 # Force TFTP Server
 dhcp-option=66,${SERVER_IP}
@@ -258,7 +266,7 @@ setup_eve_versions() {
     OLD_IFS=$IFS
     IFS=','
     for version in $EVE_VERSIONS; do
-        echo "\nProcessing EVE-OS version: ${version}"
+            printf "\nProcessing EVE-OS version: %s\n" "${version}"
         if [ ! -d "/data/httpboot/${version}" ]; then
             echo "Downloading version ${version}..."
             EVE_TAR_URL="https://github.com/lf-edge/eve/releases/download/${version}/amd64.kvm.generic.installer-net.tar"
@@ -510,7 +518,8 @@ setup_eve_versions
 # 3. Generate boot menu
 generate_boot_menu
 
-# 4. Configure dnsmasq
+# 4. Configure boot files
+generate_autoexec
 generate_dnsmasq_conf
 
 # 5. Download bootloaders
