@@ -171,13 +171,6 @@ generate_autoexec() {
 generate_dnsmasq_conf() {
     printf "Generating dnsmasq configuration...\n"
 
-    # Create initial TFTP configuration that chains to HTTP
-    cat > /tftpboot/ipxe.efi.cfg <<EOL
-#!ipxe
-dhcp
-chain --autofree http://${SERVER_IP}/boot.ipxe || shell
-EOL
-
     # Base configuration
     cat > /etc/dnsmasq.conf <<EOL
 # Base Configuration
@@ -190,20 +183,20 @@ log-dhcp
 enable-tftp
 tftp-root=/tftpboot
 
+# Set next-server explicitly
+dhcp-option=option:tftp-server,${SERVER_IP}
+
 # Client Detection
 dhcp-match=set:ipxe,175
+dhcp-match=set:ipxe-ok,option:user-class,iPXE
 dhcp-match=set:efi64,option:client-arch,7
 dhcp-match=set:efi64,option:client-arch,9
 
 # Non-iPXE UEFI clients get iPXE binary
 dhcp-boot=tag:!ipxe,tag:efi64,ipxe.efi,,${SERVER_IP}
-pxe-service=tag:efi64,X86-64_EFI,"EVE-OS Network Boot",ipxe.efi
 
-# iPXE clients get HTTP config directly
+# iPXE clients get HTTP URL directly
 dhcp-option=tag:ipxe,option:bootfile-name,http://${SERVER_IP}/latest/ipxe.efi.cfg
-
-# Force TFTP Server
-dhcp-option=66,${SERVER_IP}
 EOL
 
     # DHCP Mode-specific configuration
