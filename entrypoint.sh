@@ -71,7 +71,7 @@ validate_eve_versions() {
     return 0
 }
 
-# Function to validate required environment variables
+# Function to validate required environment variables and system state
 validate_environment() {
     local has_error=0
 
@@ -100,6 +100,21 @@ validate_environment() {
     LOG_LEVEL=${LOG_LEVEL:="info"}
     DHCP_MODE=${DHCP_MODE:="proxy"}
     DHCP_SUBNET_MASK=${DHCP_SUBNET_MASK:="255.255.255.0"}
+
+    # Validate interface and IP configuration
+    if ! ip addr show "$LISTEN_INTERFACE" &>/dev/null; then
+        echo "Error: Interface $LISTEN_INTERFACE not found"
+        has_error=1
+    elif ! ip addr show "$LISTEN_INTERFACE" | grep -q "$SERVER_IP"; then
+        echo "Error: IP $SERVER_IP not configured on $LISTEN_INTERFACE"
+        has_error=1
+    fi
+
+    # Check HTTP port availability
+    if netstat -ln | grep -q ':80.*LISTEN'; then
+        echo "Error: Port 80 is already in use"
+        has_error=1
+    fi
 
     # Validate DHCP mode-specific configuration
     case "$DHCP_MODE" in
@@ -852,30 +867,54 @@ fi
 # 5. Set final permissions
 set_file_permissions
 
-# 6. Pre-start validation
-echo "Running pre-start validation..."
-chmod +x /scripts/validate-server.sh
-/scripts/validate-server.sh || exit 1
+# 6. Final pre-start validation
+echo "Running final validation checks..."
 
-# 7. Test nginx configuration
+# Verify critical files and permissions
+echo "Checking critical files and permissions..."
+CRITICAL_FILES=(
+    "/data/httpboot/boot.ipxe"
+    "/data/httpboot/latest/ipxe.efi"
+    "/data/httpboot/latest/ipxe.efi.cfg"
+    "/data/httpboot/latest/EFI/BOOT/BOOTX64.EFI"
+)
+
+for file in "${CRITICAL_FILES[@]}"; do
+    if [ ! -f "$file" ]; then
+        echo "ERROR: Critical file missing: $file"
+        exit 1
+    fi
+
+    if ! su -s /bin/sh www-data -c "test -r \"$file\""; then
+        echo "ERROR: www-data cannot read: $file"
+        exit 1
+    fi
+done
+
+# Verify boot.ipxe content
+echo "Verifying boot.ipxe content..."
+if ! grep -q "chain --autofree" /data/httpboot/boot.ipxe; then
+    echo "ERROR: boot.ipxe appears to be invalid"
+    echo "Content:"
+    cat /data/httpboot/boot.ipxe
+    exit 1
+fi
+
+# Test nginx configuration
 echo "Testing nginx configuration..."
 if ! nginx -t; then
     echo "ERROR: Invalid nginx configuration"
     exit 1
 fi
 
-# 8. Test boot.ipxe accessibility
-echo "Testing boot.ipxe accessibility..."
-if ! curl -s -f http://localhost/boot.ipxe --unix-socket /var/run/nginx.sock > /dev/null; then
-    echo "ERROR: boot.ipxe is not accessible via nginx"
-    echo "Current boot.ipxe content:"
-    cat /data/httpboot/boot.ipxe
-    echo "\nFile permissions:"
-    ls -l /data/httpboot/boot.ipxe
+# Test dnsmasq configuration
+echo "Testing dnsmasq configuration..."
+if ! dnsmasq --test; then
+    echo "ERROR: Invalid dnsmasq configuration"
     exit 1
 fi
 
-# 9. Start services with enhanced logging
+# Start services with enhanced logging
 echo "Starting services..."
 echo "Starting nginx with debug logging..."
 nginx -g "daemon off; error_log /dev/stdout debug;" &
