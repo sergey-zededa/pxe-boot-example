@@ -199,8 +199,7 @@ enable-tftp
 tftp-root=/tftpboot
 
 # Set next-server explicitly
-dhcp-option=66,${SERVER_IP}  # TFTP server
-dhcp-option=next-server,${SERVER_IP}  # Boot server
+dhcp-option=option:tftp-server,${SERVER_IP}
 
 # Client Detection
 dhcp-match=set:ipxe,175
