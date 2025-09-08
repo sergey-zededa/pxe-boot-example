@@ -392,20 +392,24 @@ fi
             echo "Version ${version} found in cache"
         fi
 
-        # Set up first version as default
+# Set up first version as default
         if [ -z "$DEFAULT_VERSION" ]; then
             DEFAULT_VERSION=$version
             echo "Setting ${version} as default version"
+            
+            # Set up TFTP boot files
             cp "/data/httpboot/${DEFAULT_VERSION}/ipxe.efi" /tftpboot/ipxe.efi
             chown dnsmasq:dnsmasq /tftpboot/ipxe.efi
             chmod 644 /tftpboot/ipxe.efi
             
-            # Create 'latest' as a full copy
             echo "Creating 'latest' directory with files from ${version}..."
             rm -rf "/data/httpboot/latest"
-            cp -r "/data/httpboot/${version}" "/data/httpboot/latest"
+            mkdir -p "/data/httpboot/latest"
             
-            # Ensure 'latest' has correct permissions
+            # Copy files to latest directory
+            cd "/data/httpboot/${version}" && find . -type f -exec cp --parents {} "/data/httpboot/latest/" \;
+            
+            # Ensure correct ownership and permissions
             chown -R www-data:www-data "/data/httpboot/latest"
             find "/data/httpboot/latest" -type f -exec chmod 644 {} \;
             find "/data/httpboot/latest" -type d -exec chmod 755 {} \;
@@ -420,6 +424,15 @@ fi
                 echo "✓ BOOTX64.EFI is present in 'latest' directory"
             else
                 echo "✗ WARNING: BOOTX64.EFI is missing from 'latest' directory!"
+            fi
+            
+            # Extra verification step
+            echo "\nVerifying file access:"
+            if su -s /bin/sh www-data -c "test -r /data/httpboot/latest/ipxe.efi.cfg"; then
+                echo "✓ www-data can read ipxe.efi.cfg in latest directory"
+            else
+                echo "✗ WARNING: www-data cannot read ipxe.efi.cfg in latest directory!"
+            fi
             fi
         fi
 
