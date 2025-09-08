@@ -361,14 +361,28 @@ setup_eve_versions() {
                 rm -rf "${ISO_EXTRACT_DIR}"
             fi
 
-            # Final verification
-            echo "\nFinal file structure verification for ${version}:"
-            if [ -f "/data/httpboot/${version}/EFI/BOOT/BOOTX64.EFI" ]; then
-                echo "✓ BOOTX64.EFI is present and accessible"
-                ls -l "/data/httpboot/${version}/EFI/BOOT/BOOTX64.EFI"
-            else
-                echo "✗ WARNING: BOOTX64.EFI is missing!"
-            fi
+# Final verification
+echo "\nFinal file structure verification for ${version}:"
+if [ -f "/data/httpboot/${version}/EFI/BOOT/BOOTX64.EFI" ]; then
+    echo "✓ BOOTX64.EFI is present and accessible"
+    ls -l "/data/httpboot/${version}/EFI/BOOT/BOOTX64.EFI"
+    
+    # Ensure all files are readable
+    find "/data/httpboot/${version}" -type f -exec sh -c 'if ! su -s /bin/sh www-data -c "test -r {}" ; then echo "Warning: {} not readable by www-data"; fi' \;
+    
+    # Test nginx config
+    echo "\nTesting nginx configuration..."
+    nginx -t
+    
+    # Verify that nginx can access files
+    if ! su -s /bin/sh www-data -c "cat /data/httpboot/${version}/ipxe.efi.cfg" > /dev/null 2>&1; then
+        echo "Warning: www-data cannot read ipxe.efi.cfg"
+    else
+        echo "✓ www-data can read ipxe.efi.cfg"
+    fi
+else
+    echo "✗ WARNING: BOOTX64.EFI is missing!"
+fi
             
             # Set proper permissions for extracted files
             chown -R www-data:www-data "/data/httpboot/${version}"
