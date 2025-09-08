@@ -26,6 +26,7 @@ RUN mkdir -p /tftpboot /data/httpboot /data/downloads /run/nginx && \
 # 4. Copy configuration and scripts
 COPY config/nginx.conf /etc/nginx/nginx.conf
 COPY config/*.template /config/
+COPY scripts/ /scripts/
 COPY entrypoint.sh /entrypoint.sh
 RUN dos2unix /entrypoint.sh && \
     dos2unix /config/*.template && \

@@ -852,10 +852,34 @@ fi
 # 5. Set final permissions
 set_file_permissions
 
-# 6. Start services
-echo "Starting services..."
-echo "Starting nginx..."
-nginx
+# 6. Pre-start validation
+echo "Running pre-start validation..."
+chmod +x /scripts/validate-server.sh
+/scripts/validate-server.sh || exit 1
 
-echo "Starting dnsmasq..."
-exec dnsmasq --no-daemon --conf-file=/etc/dnsmasq.conf --log-facility=-
+# 7. Test nginx configuration
+echo "Testing nginx configuration..."
+if ! nginx -t; then
+    echo "ERROR: Invalid nginx configuration"
+    exit 1
+fi
+
+# 8. Test boot.ipxe accessibility
+echo "Testing boot.ipxe accessibility..."
+if ! curl -s -f http://localhost/boot.ipxe --unix-socket /var/run/nginx.sock > /dev/null; then
+    echo "ERROR: boot.ipxe is not accessible via nginx"
+    echo "Current boot.ipxe content:"
+    cat /data/httpboot/boot.ipxe
+    echo "\nFile permissions:"
+    ls -l /data/httpboot/boot.ipxe
+    exit 1
+fi
+
+# 9. Start services with enhanced logging
+echo "Starting services..."
+echo "Starting nginx with debug logging..."
+nginx -g "daemon off; error_log /dev/stdout debug;" &
+NGINX_PID=$!
+
+echo "Starting dnsmasq with debug logging..."
+exec dnsmasq --no-daemon --conf-file=/etc/dnsmasq.conf --log-facility=- --log-dhcp --log-queries
