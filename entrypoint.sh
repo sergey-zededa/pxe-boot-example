@@ -196,7 +196,7 @@ dhcp-match=set:efi64,option:client-arch,9
 dhcp-boot=tag:!ipxe,tag:efi64,ipxe.efi,,${SERVER_IP}
 
 # iPXE clients get HTTP URL directly
-dhcp-option=tag:ipxe,option:bootfile-name,http://${SERVER_IP}/latest/ipxe.efi.cfg
+dhcp-option=tag:ipxe,option:bootfile-name,http://${SERVER_IP}/boot.ipxe
 EOL
 
     # DHCP Mode-specific configuration
@@ -611,12 +611,6 @@ prompt --timeout 5000 Press any key to return to menu or wait 5 seconds...
 goto start
 EOF
 
-    # Set permissions
-    chmod 644 /data/httpboot/boot.ipxe
-    chown www-data:www-data /data/httpboot/boot.ipxe
-    
-    echo "Boot menu generated successfully"
-    
     # Set permissions
     chmod 644 /data/httpboot/boot.ipxe
     chown www-data:www-data /data/httpboot/boot.ipxe
