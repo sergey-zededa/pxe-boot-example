@@ -11,10 +11,7 @@ RUN apk add --no-cache \
     bash
 
 # 2. Create users and groups
-RUN addgroup -S -g 82 www-data && \
-    adduser -S -u 82 -D -H -h /var/www -s /sbin/nologin -G www-data -g www-data www-data && \
-    addgroup -S dnsmasq && \
-    adduser -S -D -H -h /dev/null -s /sbin/nologin -G dnsmasq -g dnsmasq dnsmasq
+RUN adduser -S -u 82 -D -H -h /var/www -s /sbin/nologin -G www-data -g www-data www-data
 
 # 3. Create necessary directories with proper permissions
 RUN mkdir -p /tftpboot /data/httpboot /data/downloads /run/nginx && \
