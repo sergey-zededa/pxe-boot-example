@@ -262,11 +262,28 @@ setup_eve_versions() {
         if [ ! -d "/data/httpboot/${version}" ]; then
             echo "Downloading version ${version}..."
             EVE_TAR_URL="https://github.com/lf-edge/eve/releases/download/${version}/amd64.kvm.generic.installer-net.tar"
-            curl -L -o "/data/downloads/netboot-${version}.tar" "${EVE_TAR_URL}"
+            if ! curl -L --fail -o "/data/downloads/netboot-${version}.tar" "${EVE_TAR_URL}"; then
+                echo "Error: Failed to download EVE-OS version ${version}"
+                echo "URL: ${EVE_TAR_URL}"
+                exit 1
+            fi
 
             echo "Extracting assets..."
             mkdir -p "/data/httpboot/${version}"
-            tar -xf "/data/downloads/netboot-${version}.tar" -C "/data/httpboot/${version}/"
+            if ! tar -xf "/data/downloads/netboot-${version}.tar" -C "/data/httpboot/${version}/"; then
+                echo "Error: Failed to extract EVE-OS files for version ${version}"
+                exit 1
+            fi
+
+            # Verify required files exist
+            for file in kernel initrd.img ucode.img; do
+                if [ ! -f "/data/httpboot/${version}/${file}" ]; then
+                    echo "Error: Required file ${file} not found in EVE-OS archive for version ${version}"
+                    exit 1
+                fi
+                echo "Verified ${file} exists"
+            done
+
             rm "/data/downloads/netboot-${version}.tar"
             
             # Set proper permissions for extracted files
