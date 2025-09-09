@@ -37,7 +37,7 @@ dhcp-relay={{PRIMARY_DHCP_IP}}
 dhcp-option=tag:ipxe,option:bootfile-name,http://{{SERVER_IP}}/{{DEFAULT_VERSION}}/ipxe.efi.cfg
 
 # Set TFTP server for non-iPXE clients
-dhcp-option=tag:!ipxe,option:bootfile-name,ipxe.efi
+dhcp-option=tag:!ipxe,option:bootfile-name,undionly.kpxe
 
 {{#if DHCP_DOMAIN_NAME}}
 # Domain name configuration
