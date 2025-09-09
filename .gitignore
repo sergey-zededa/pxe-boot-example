@@ -20,3 +20,4 @@ ehthumbs.db
 # Test files
 test/*.log
 test/*.qcow2
+.DS_Store
