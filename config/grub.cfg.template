@@ -1,0 +1,25 @@
+# Load required modules
+insmod all_video
+insmod efi_gop
+insmod efi_uga
+insmod font
+insmod gfxterm
+
+# Initialize network
+insmod net
+insmod efinet
+insmod http
+
+# Set net device and server
+net_default_server="{{SERVER_IP}}"
+net_default_interface="0"
+
+echo "Initializing network..."
+net_init
+
+echo "Configuring network boot..."
+set prefix=(http,$net_default_server)/{{VERSION}}
+set root=$prefix
+
+echo "Loading EVE-OS GRUB configuration..."
+configfile ($prefix)/grub/grub.cfg

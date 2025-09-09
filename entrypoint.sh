@@ -301,6 +301,12 @@ setup_eve_versions() {
             # Set up directory structure
             mkdir -p "/data/httpboot/${version}/EFI/BOOT/"
 
+            # Generate version-specific GRUB configuration
+            sed "s/{{SERVER_IP}}/${SERVER_IP}/g; s/{{VERSION}}/${version}/g" \
+                /config/grub.cfg.template > "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
+            chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
+            chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
+
             # Handle EFI-related files first
             if [ -f "${TEMP_DIR}/EFI/BOOT/BOOTX64.EFI" ]; then
                 echo "Copying EFI boot files..."
