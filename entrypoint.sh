@@ -9,16 +9,20 @@ process_template() {
     local template_name=$(basename "$template_path")
     local variables=$3
     local temp_script=$(mktemp)
+    local temp_vars=$(mktemp)
 
     # Check template existence
     if [ ! -f "$template_path" ]; then
         echo "ERROR: Template $template_name not found!"
-        rm -f "$temp_script"
+        rm -f "$temp_script" "$temp_vars"
         exit 1
     fi
 
     echo "Processing template: $template_name"
     echo "Output path: $output_path"
+
+    # Write variables to temporary file for processing
+    echo "$variables" > "$temp_vars"
 
     # Create a temporary sed script
     echo "Creating sed script with variable substitutions"
@@ -27,7 +31,7 @@ process_template() {
             echo "s/{{${key}}}/${value//\//\\/}/g" >> "$temp_script"
             echo "  - Substituting: {{${key}}} → ${value}"
         fi
-    done <<< "$variables"
+    done < "$temp_vars"
 
     # If no substitutions were added, create a no-op script
     if [ ! -s "$temp_script" ]; then
@@ -40,7 +44,7 @@ process_template() {
     local sed_status=$?
 
     # Clean up
-    rm -f "$temp_script"
+    rm -f "$temp_script" "$temp_vars"
 
     # Verify output
     if [ $sed_status -ne 0 ] || [ ! -f "$output_path" ]; then
@@ -92,6 +96,32 @@ Example:
     -e DHCP_ROUTER="192.168.1.1" \
     ipxe-server:latest
 EOF
+}
+
+# Function to check if either pattern exists in a file
+check_patterns() {
+    local file="$1"
+    local pattern1="$2"
+    local pattern2="$3"
+    local desc="$4"
+    local found1=false
+    local found2=false
+
+    if grep -F "$pattern1" "$file" >/dev/null 2>&1; then
+        found1=true
+    fi
+    if grep -F "$pattern2" "$file" >/dev/null 2>&1; then
+        found2=true
+    fi
+
+    if [ "$found1" = false ] && [ "$found2" = false ]; then
+        echo "WARNING: $desc not found in generated config"
+        echo "Expected either:"
+        echo "  $pattern1"
+        echo "  $pattern2"
+        return 1
+    fi
+    return 0
 }
 
 # Function to validate IP address format
