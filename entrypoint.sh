@@ -875,16 +875,18 @@ generate_version_config() {
         echo "ERROR: Generated config missing required iPXE header!"
         exit 1
     fi
-    # Check for next-server setting (either literal IP or variable)
-    if ! grep -E -q "set next-server (${SERVER_IP}|\\\${next-server})" "/data/httpboot/${version}/ipxe.efi.cfg"; then
+    # Check for next-server setting using two simple patterns to avoid fragile regex
+    if ! grep -q "set next-server ${SERVER_IP}" "/data/httpboot/${version}/ipxe.efi.cfg" \
+       && ! grep -q 'set next-server ${next-server}' "/data/httpboot/${version}/ipxe.efi.cfg"; then
         echo "WARNING: next-server not set in generated config"
-        echo "Looking for either '${SERVER_IP}' or '\${next-server}'"
+        echo "Expected one of: 'set next-server ${SERVER_IP}' or 'set next-server ${next-server}'"
     fi
 
-    # Check for boot-url setting (using either form)
-    if ! grep -E -q "set boot-url http://(${SERVER_IP}|\\\${next-server})/${version}" "/data/httpboot/${version}/ipxe.efi.cfg"; then
+    # Check for boot-url setting using two simple patterns to avoid fragile regex
+    if ! grep -q "set boot-url http://${SERVER_IP}/${version}" "/data/httpboot/${version}/ipxe.efi.cfg" \
+       && ! grep -q "set boot-url http://\${next-server}/${version}" "/data/httpboot/${version}/ipxe.efi.cfg"; then
         echo "WARNING: Boot URL variable injection may have failed"
-        echo "Looking for URL with either '${SERVER_IP}' or '\${next-server}'"
+        echo "Expected one of: 'set boot-url http://${SERVER_IP}/${version}' or 'set boot-url http://\${next-server}/${version}'"
     fi
 
     echo "Successfully generated iPXE config for version ${version}"
