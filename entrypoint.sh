@@ -220,8 +220,7 @@ enable-tftp
 tftp-root=/tftpboot
 
 # TFTP optimizations for large files
-tftp-blocksize=8192
-tftp-no-blocksize=no
+tftp-block-size=8192
 tftp-max-failures=100
 tftp-mtu=1500
 
@@ -827,10 +826,12 @@ generate_version_config() {
         echo "ERROR: Generated config missing required iPXE header!"
         exit 1
     fi
-    if ! grep -q "set next-server ${SERVER_IP}" "/data/httpboot/${version}/ipxe.efi.cfg"; then
-        echo "WARNING: Server IP variable injection may have failed"
+    # next-server may be a literal IP or templated variable; accept either
+    if ! grep -E -q "set next-server ((${SERVER_IP})|\${next-server})" "/data/httpboot/${version}/ipxe.efi.cfg"; then
+        echo "WARNING: next-server not set in generated config"
     fi
-    if ! grep -q "set boot-url http://${SERVER_IP}/${version}" "/data/httpboot/${version}/ipxe.efi.cfg"; then
+    # boot-url may use the next-server variable; accept both forms
+    if ! grep -E -q "set boot-url http://((${SERVER_IP})|\${next-server})/${version}" "/data/httpboot/${version}/ipxe.efi.cfg"; then
         echo "WARNING: Boot URL variable injection may have failed"
     fi
 
