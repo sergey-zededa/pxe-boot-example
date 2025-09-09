@@ -334,21 +334,36 @@ generate_dnsmasq_conf() {
         DEBUG=0
     fi
 
+    # Build mode-specific DHCP configuration block
+    DHCP_CONFIG=""
+    if [ "$DHCP_MODE" = "standalone" ]; then
+        DHCP_CONFIG="# Standalone DHCP Configuration\n"
+        DHCP_CONFIG+="dhcp-range=${DHCP_RANGE_START},${DHCP_RANGE_END},${DHCP_SUBNET_MASK},12h\n"
+        DHCP_CONFIG+="dhcp-option=option:router,${DHCP_ROUTER}\n"
+    else
+        DHCP_CONFIG="# Proxy DHCP Configuration\n"
+        DHCP_CONFIG+="dhcp-range=${NETWORK_ADDRESS},proxy,${DHCP_SUBNET_MASK}\n"
+        if [ -n "$PRIMARY_DHCP_IP" ]; then
+            DHCP_CONFIG+="dhcp-relay=${PRIMARY_DHCP_IP}\n"
+        fi
+    fi
+
+    # Optional blocks
+    DOMAIN_CONFIG=""
+    [ -n "$DHCP_DOMAIN_NAME" ] && DOMAIN_CONFIG="domain=${DHCP_DOMAIN_NAME}"
+
+    BROADCAST_CONFIG=""
+    [ -n "$DHCP_BROADCAST_ADDRESS" ] && BROADCAST_CONFIG="dhcp-option=28,${DHCP_BROADCAST_ADDRESS}"
+
+    DEBUG_CONFIG=""
+    [ "$LOG_LEVEL" = "debug" ] && DEBUG_CONFIG=$'# Debug Logging\nlog-queries\nlog-dhcp'
+
     # Generate configuration using template
     echo "Processing dnsmasq configuration template..."
-    sed -e "s/{{LISTEN_INTERFACE}}/${LISTEN_INTERFACE}/g" \
-        -e "s/{{SERVER_IP}}/${SERVER_IP}/g" \
-        -e "s/{{DHCP_SUBNET_MASK}}/${DHCP_SUBNET_MASK}/g" \
-        -e "s/{{NETWORK_ADDRESS}}/${NETWORK_ADDRESS}/g" \
-        -e "s/{{STANDALONE_MODE}}/${STANDALONE_MODE}/g" \
-        -e "s/{{DHCP_RANGE_START}}/${DHCP_RANGE_START}/g" \
-        -e "s/{{DHCP_RANGE_END}}/${DHCP_RANGE_END}/g" \
-        -e "s/{{DHCP_ROUTER}}/${DHCP_ROUTER}/g" \
-        -e "s/{{PRIMARY_DHCP_IP}}/${PRIMARY_DHCP_IP}/g" \
-        -e "s/{{DHCP_DOMAIN_NAME}}/${DHCP_DOMAIN_NAME}/g" \
-        -e "s/{{DHCP_BROADCAST_ADDRESS}}/${DHCP_BROADCAST_ADDRESS}/g" \
-        -e "s/{{DEBUG}}/${DEBUG}/g" \
-        "/config/dnsmasq.conf.template" > "/etc/dnsmasq.conf"
+    process_template \
+        "/config/dnsmasq.conf.template" \
+        "/etc/dnsmasq.conf" \
+        $'LISTEN_INTERFACE='"${LISTEN_INTERFACE}""\n"$'SERVER_IP='"${SERVER_IP}""\n"$'DHCP_SUBNET_MASK='"${DHCP_SUBNET_MASK}""\n"$'NETWORK_ADDRESS='"${NETWORK_ADDRESS}""\n"$'DHCP_CONFIG='"${DHCP_CONFIG}""\n"$'DOMAIN_CONFIG='"${DOMAIN_CONFIG}""\n"$'BROADCAST_CONFIG='"${BROADCAST_CONFIG}""\n"$'DEBUG_CONFIG='"${DEBUG_CONFIG}"' 
 
     # Validate configuration
     echo "Validating dnsmasq configuration..."
