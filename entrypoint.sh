@@ -566,14 +566,31 @@ generate_boot_menu() {
     echo "Generating iPXE boot menu..."
     
     # Create initial menu file
-    cat > /data/httpboot/boot.ipxe <<EOF
+    cat > /data/httpboot/boot.ipxe <<'EOF'
 #!ipxe
 
-# Enable debugging
+# Enable debugging and wait for network
 set debug all
+set debug dhcp,net
 
+:retry_dhcp
+echo Configuring network...
+dhcp || goto retry_dhcp_fail
+
+echo Network configured successfully:
+echo IP: ${net0/ip}
+echo Netmask: ${net0/netmask}
+echo Gateway: ${net0/gateway}
+echo DNS: ${net0/dns}
+
+# Main menu
 :start
 menu EVE-OS Boot Menu
+item --gap -- System Information:
+item --gap -- Client IP: ${net0/ip}
+item --gap -- Architecture: ${buildarch}
+item --gap -- Manufacturer: ${smbios/manufacturer}
+item --gap --
 item --gap -- Available versions:
 EOF
     
@@ -589,7 +606,7 @@ EOF
     IFS=$OLD_IFS
     
     # Add menu footer
-    cat >> /data/httpboot/boot.ipxe <<EOF
+    cat >> /data/httpboot/boot.ipxe <<'EOF'
 
 item
 item --gap -- Tools:
@@ -603,11 +620,17 @@ item --gap Selected version will boot in ${BOOT_MENU_TIMEOUT} seconds
 item --gap Server IP: ${SERVER_IP}
 
 choose --timeout ${BOOT_MENU_TIMEOUT}000 --default eve_1 selected || goto menu_error
-goto \${selected}
+goto ${selected}
+
+:retry_dhcp_fail
+echo DHCP configuration failed. Retrying in 3 seconds...
+sleep 3
+goto retry_dhcp
 
 :menu_error
 echo Menu selection failed
-echo Error: \${errno}
+echo Error: ${errno}
+echo Error message: ${errstr}
 prompt --timeout 5000 Press any key to retry or wait 5 seconds...
 goto start
 EOF
@@ -679,89 +702,44 @@ validate_environment
 setup_eve_versions
 
 # Source iPXE configuration functions
-# Function to generate version-specific configuration
+# Function to generate version-specific iPXE config
 generate_version_config() {
     local version=$1
     echo "Generating iPXE config for version ${version}..."
-    
-    cat > "/data/httpboot/${version}/ipxe.efi.cfg" <<'EOF'
-#!ipxe
 
-# Enable debugging
-set debug all
-set debug dhcp,net
+    # Create version directory if it doesn't exist
+    mkdir -p "/data/httpboot/${version}"
 
-# Force our server address
-set next-server ${SERVER_IP}
-set boot-url http://${next-server}/${version}
+    # Generate config from template
+    echo "Using template from /config/ipxe.efi.cfg.template"
+    if [ ! -f "/config/ipxe.efi.cfg.template" ]; then
+        echo "ERROR: Template file /config/ipxe.efi.cfg.template not found!"
+        exit 1
+    fi
 
-# Verify network configuration
-echo iPXE boot starting...
-echo Network Status:
-echo IP: ${net0/ip}
-echo Netmask: ${net0/netmask}
-echo Gateway: ${net0/gateway}
-echo DNS: ${net0/dns}
-echo Server: ${next-server}
-echo Boot URL: ${boot-url}
+    # Replace variables in template
+    echo "Injecting variables: SERVER_IP=${SERVER_IP}, VERSION=${version}"
+    sed "s/{{SERVER_IP}}/${SERVER_IP}/g; s/{{VERSION}}/${version}/g" \
+        /config/ipxe.efi.cfg.template > "/data/httpboot/${version}/ipxe.efi.cfg"
 
-# Detect architecture and platform
-echo Architecture: ${buildarch}
-echo Platform: ${platform}
-echo Manufacturer: ${smbios/manufacturer}
-
-# Set boot parameters
-set console console=ttyS0,115200n8 console=tty0
-set eve_args eve_soft_serial=${mac:hexhyp} eve_reboot_after_install getty
-set installer_args root=/initrd.image find_boot=netboot overlaytmpfs fastboot
-
-# Hardware-specific console settings
-iseq ${smbios/manufacturer} Huawei && set console console=ttyAMA0,115200n8 ||
-iseq ${smbios/manufacturer} Huawei && set platform_tweaks pcie_aspm=off pci=pcie_bus_perf ||
-iseq ${smbios/manufacturer} Supermicro && set console console=ttyS1,115200n8 ||
-iseq ${smbios/manufacturer} QEMU && set console console=hvc0 console=ttyS0 ||
-
-# Chain to appropriate bootloader
-:check_arch
-iseq ${buildarch} x86_64 && goto boot_x86_64 ||
-iseq ${buildarch} arm64 && goto boot_arm64 ||
-iseq ${buildarch} riscv64 && goto boot_riscv64 ||
-goto arch_error
-
-:boot_x86_64
-echo Booting x86_64 EVE-OS...
-chain ${boot-url}/EFI/BOOT/BOOTX64.EFI || goto error
-
-:boot_arm64
-echo Booting arm64 EVE-OS...
-chain ${boot-url}/EFI/BOOT/BOOTAA64.EFI || goto error
-
-:boot_riscv64
-echo Booting RISC-V 64-bit EVE-OS...
-chain ${boot-url}/EFI/BOOT/BOOTRISCV64.EFI || goto error
-
-:arch_error
-echo Error: Unsupported architecture ${buildarch}
-echo Supported architectures: x86_64, arm64, riscv64
-prompt Press any key to retry...
-goto check_arch
-
-:error
-echo Boot failed! Error: ${errno}
-echo Message: ${errstr}
-echo URL attempted: ${boot-url}/EFI/BOOT/BOOT${buildarch}.EFI
-echo Common error codes:
-echo 1 - File not found
-echo 2 - Access denied
-echo 3 - Disk error
-echo 4 - Network error
-prompt Press any key to retry...
-goto check_arch
-EOF
-
+    # Set permissions
     chmod 644 "/data/httpboot/${version}/ipxe.efi.cfg"
     chown www-data:www-data "/data/httpboot/${version}/ipxe.efi.cfg"
-    echo "Generated iPXE config for version ${version}"
+
+    # Verify the generated config
+    echo "Verifying generated config..."
+    if ! grep -q "^#!ipxe" "/data/httpboot/${version}/ipxe.efi.cfg"; then
+        echo "ERROR: Generated config missing required iPXE header!"
+        exit 1
+    fi
+    if ! grep -q "set next-server ${SERVER_IP}" "/data/httpboot/${version}/ipxe.efi.cfg"; then
+        echo "WARNING: Server IP variable injection may have failed"
+    fi
+    if ! grep -q "set boot-url http://${SERVER_IP}/${version}" "/data/httpboot/${version}/ipxe.efi.cfg"; then
+        echo "WARNING: Boot URL variable injection may have failed"
+    fi
+
+    echo "Successfully generated iPXE config for version ${version}"
 }
 
 # Function to generate boot menu

@@ -1,22 +1,32 @@
 #!ipxe
 
-# Enable debugging
+# Enable debugging for network and DHCP
 set debug all
+set debug dhcp,net
 
-# Force our server address and boot URL
-set server {{SERVER_IP}}
-set version {{VERSION}}
-set boot-url http://${server}/${version}
+# Force our server address
+set next-server {{SERVER_IP}}
+set boot-url http://${next-server}/{{VERSION}}
 
-# Uncomment ntp lines for devices without RTC (RPI for example)
-#echo Getting the current time from ntp...
-#:retry_ntp
-#ntp pool.ntp.org || goto retry_ntp
+# Initialize network
+:retry_net
+echo Initializing network stack...
+dhcp || goto retry_net_error
 
+# Verify network configuration
 echo iPXE boot starting...
-echo Server: ${server}
+echo Network Status:
+echo IP: ${net0/ip}
+echo Netmask: ${net0/netmask}
+echo Gateway: ${net0/gateway}
+echo DNS: ${net0/dns}
+echo Server: ${next-server}
 echo Boot URL: ${boot-url}
-echo Version: ${version}
+
+# Detect architecture and platform
+echo Architecture: ${buildarch}
+echo Platform: ${platform}
+echo Manufacturer: ${smbios/manufacturer}
 
 # Set boot parameters
 set console console=ttyS0,115200n8 console=tty0
@@ -30,12 +40,47 @@ iseq ${smbios/manufacturer} Supermicro && set console console=ttyS1,115200n8 ||
 iseq ${smbios/manufacturer} QEMU && set console console=hvc0 console=ttyS0 ||
 
 # Chain to appropriate bootloader
-iseq ${buildarch} x86_64 && chain ${boot-url}/EFI/BOOT/BOOTX64.EFI ||
-iseq ${buildarch} arm64 && chain ${boot-url}/EFI/BOOT/BOOTAA64.EFI ||
-iseq ${buildarch} riscv64 && chain ${boot-url}/EFI/BOOT/BOOTRISCV64.EFI ||
+:check_arch
+iseq ${buildarch} x86_64 && goto boot_x86_64 ||
+iseq ${buildarch} arm64 && goto boot_arm64 ||
+iseq ${buildarch} riscv64 && goto boot_riscv64 ||
+goto arch_error
 
-:error
-echo Boot failed! Error: ${errno}
+:boot_x86_64
+echo Booting x86_64 EVE-OS...
+chain ${boot-url}/EFI/BOOT/BOOTX64.EFI || goto chain_error
+
+:boot_arm64
+echo Booting arm64 EVE-OS...
+chain ${boot-url}/EFI/BOOT/BOOTAA64.EFI || goto chain_error
+
+:boot_riscv64
+echo Booting RISC-V 64-bit EVE-OS...
+chain ${boot-url}/EFI/BOOT/BOOTRISCV64.EFI || goto chain_error
+
+:retry_net_error
+echo Network initialization failed
+echo Error: ${errno}
 echo Message: ${errstr}
+echo Retrying in 3 seconds...
+sleep 3
+goto retry_net
+
+:arch_error
+echo Error: Unsupported architecture ${buildarch}
+echo Supported architectures: x86_64, arm64, riscv64
 prompt Press any key to retry...
-goto start
+goto check_arch
+
+:chain_error
+echo Chain loading failed!
+echo Error: ${errno}
+echo Message: ${errstr}
+echo URL attempted: ${boot-url}/EFI/BOOT/BOOT${buildarch}.EFI
+echo Common error codes:
+echo 1 - File not found
+echo 2 - Access denied
+echo 3 - Disk error
+echo 4 - Network error
+prompt Press any key to retry...
+goto check_arch
