@@ -92,10 +92,9 @@ enable-tftp
 tftp-root=/tftpboot
 
 # Performance options
-tftp-blocksize=8192
-tftp-no-blocksize=no
-tftp-mtu=1500
-tftp-max-failures=100
+tftp-block-size=8192       # Correct hyphenated option name
+tftp-mtu=1500             # Maximum transmission unit
+tftp-max-failures=100     # Retry limit for failed blocks
 ```
 
 #### Critical Settings

@@ -20,8 +20,7 @@ enable-tftp
 tftp-root=/tftpboot
 
 # TFTP performance options
-tftp-blocksize=1024          # Default is too small for iPXE
-tftp-no-blocksize=no        # Allow negotiation
+tftp-block-size=8192         # Correct option name, larger size for iPXE
 tftp-mtu=1500              # Maximum transmission unit
 tftp-max-failures=100      # Retry limit for failed blocks
 ```

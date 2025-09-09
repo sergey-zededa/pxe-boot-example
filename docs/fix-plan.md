@@ -25,10 +25,9 @@
   # TFTP configuration
   enable-tftp
   tftp-root=/tftpboot
-  + tftp-blocksize=8192
-  + tftp-no-blocksize=no
-  + tftp-mtu=1500
-  + tftp-max-failures=100
+  tftp-block-size=8192
+  tftp-mtu=1500
+  tftp-max-failures=100
   ```
 **Rationale**: Match working configuration and dnsmasq docs for large file transfers
 
