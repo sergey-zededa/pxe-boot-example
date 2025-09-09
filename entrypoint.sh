@@ -207,70 +207,44 @@ generate_autoexec() {
 generate_dnsmasq_conf() {
     printf "Generating dnsmasq configuration...\n"
 
-    # Base configuration
-    cat > /etc/dnsmasq.conf <<EOL
-# Base Configuration
-port=0
-interface=${LISTEN_INTERFACE}
-bind-interfaces
-log-dhcp
-
-# TFTP Configuration
-enable-tftp
-tftp-root=/tftpboot
-
-# TFTP optimizations for large files
-tftp-block-size=8192
-tftp-max-failures=100
-tftp-mtu=1500
-
-# Client Detection
-dhcp-match=set:ipxe,175                   # iPXE ROM
-dhcp-match=set:efi64,option:client-arch,7  # EFI x64
-dhcp-match=set:efi64,option:client-arch,9  # EFI x64
-dhcp-match=set:ipxe-ok,option:user-class,iPXE
-
-# Server options
-dhcp-option=66,${SERVER_IP}              # TFTP server
-
-# Boot configuration for BIOS clients
-dhcp-boot=tag:!ipxe,tag:!efi64,undionly.kpxe
-
-# Boot configuration for UEFI clients
-dhcp-boot=tag:!ipxe,tag:efi64,ipxe.efi
-
-# Boot configuration for iPXE clients
-dhcp-boot=tag:ipxe,http://${SERVER_IP}/boot.ipxe
-EOL
-
-    # DHCP Mode-specific configuration
-    if [ "$DHCP_MODE" = "standalone" ]; then
-        if [ -z "$DHCP_RANGE_START" ] || [ -z "$DHCP_RANGE_END" ] || [ -z "$DHCP_ROUTER" ]; then
-            echo "Error: standalone mode requires DHCP_RANGE_START, DHCP_RANGE_END, and DHCP_ROUTER"
-            exit 1
-        fi
-        cat >> /etc/dnsmasq.conf <<EOL
-
-# Standalone DHCP Configuration
-dhcp-range=${DHCP_RANGE_START},${DHCP_RANGE_END},${DHCP_SUBNET_MASK},12h
-dhcp-option=option:router,${DHCP_ROUTER}
-EOL
-    else
-        # Proxy DHCP mode
-        NETWORK_ADDRESS=$(echo ${SERVER_IP} | awk -F. '{print $1"."$2"."$3".0"}')
-        cat >> /etc/dnsmasq.conf <<EOL
-
-# Proxy DHCP Configuration
-dhcp-range=${NETWORK_ADDRESS},proxy,${DHCP_SUBNET_MASK}
-EOL
+    # Check template existence
+    if [ ! -f "/config/dnsmasq.conf.template" ]; then
+        echo "ERROR: dnsmasq.conf.template not found in /config"
+        exit 1
     fi
 
-    # Optional DHCP parameters
-    [ -n "$DHCP_DOMAIN_NAME" ] && echo "dhcp-option=15,${DHCP_DOMAIN_NAME}" >> /etc/dnsmasq.conf
-    [ -n "$DHCP_BROADCAST_ADDRESS" ] && echo "dhcp-option=28,${DHCP_BROADCAST_ADDRESS}" >> /etc/dnsmasq.conf
+    # Compute network address for proxy mode
+    NETWORK_ADDRESS=$(echo ${SERVER_IP} | awk -F. '{print $1"."$2"."$3".0"}')
 
-    # Debug logging if requested
-    [ "$LOG_LEVEL" = "debug" ] && echo -e "\n# Debug Logging\nlog-queries\nlog-dhcp" >> /etc/dnsmasq.conf
+    # Set standalone mode flag for template
+    if [ "$DHCP_MODE" = "standalone" ]; then
+        STANDALONE_MODE=1
+    else
+        STANDALONE_MODE=0
+    fi
+
+    # Set debug flag for template
+    if [ "$LOG_LEVEL" = "debug" ]; then
+        DEBUG=1
+    else
+        DEBUG=0
+    fi
+
+    # Generate configuration using template
+    echo "Processing dnsmasq configuration template..."
+    sed -e "s/{{LISTEN_INTERFACE}}/${LISTEN_INTERFACE}/g" \
+        -e "s/{{SERVER_IP}}/${SERVER_IP}/g" \
+        -e "s/{{DHCP_SUBNET_MASK}}/${DHCP_SUBNET_MASK}/g" \
+        -e "s/{{NETWORK_ADDRESS}}/${NETWORK_ADDRESS}/g" \
+        -e "s/{{STANDALONE_MODE}}/${STANDALONE_MODE}/g" \
+        -e "s/{{DHCP_RANGE_START}}/${DHCP_RANGE_START}/g" \
+        -e "s/{{DHCP_RANGE_END}}/${DHCP_RANGE_END}/g" \
+        -e "s/{{DHCP_ROUTER}}/${DHCP_ROUTER}/g" \
+        -e "s/{{PRIMARY_DHCP_IP}}/${PRIMARY_DHCP_IP}/g" \
+        -e "s/{{DHCP_DOMAIN_NAME}}/${DHCP_DOMAIN_NAME}/g" \
+        -e "s/{{DHCP_BROADCAST_ADDRESS}}/${DHCP_BROADCAST_ADDRESS}/g" \
+        -e "s/{{DEBUG}}/${DEBUG}/g" \
+        "/config/dnsmasq.conf.template" > "/etc/dnsmasq.conf"
 
     # Validate configuration
     echo "Validating dnsmasq configuration..."
