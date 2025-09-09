@@ -8,39 +8,44 @@ process_template() {
     local output_path=$2
     local template_name=$(basename "$template_path")
     local variables=$3
+    local temp_script=$(mktemp)
 
     # Check template existence
     if [ ! -f "$template_path" ]; then
         echo "ERROR: Template $template_name not found!"
+        rm -f "$temp_script"
         exit 1
     fi
 
     echo "Processing template: $template_name"
     echo "Output path: $output_path"
 
-    # Create sed command with all variable substitutions
-    local sed_cmd="sed"
+    # Create a temporary sed script
+    echo "Creating sed script with variable substitutions"
+    while IFS='=' read -r key value; do
+        if [ -n "$key" ]; then
+            echo "s/{{${key}}}/${value//\//\\/}/g" >> "$temp_script"
+            echo "  - Substituting: {{${key}}} → ${value}"
+        fi
+    done <<< "$variables"
 
-    # Only attempt substitutions if variables are provided
-    if [ -n "$variables" ]; then
-        echo "Applying variable substitutions:"
-        # Support multi-line VARS input (key=value per line)
-        echo "$variables" | while IFS='=' read -r key value; do
-            if [ -n "$key" ]; then
-                echo "  - $key=$value"
-                sed_cmd="$sed_cmd -e 's/{{$key}}/$value/g'"
-            fi
-        done
-    else
+    # If no substitutions were added, create a no-op script
+    if [ ! -s "$temp_script" ]; then
         echo "No variables provided; copying template as-is"
+        echo 'p' > "$temp_script"
     fi
 
-    # Process template
-    eval "$sed_cmd '$template_path' > '$output_path'"
+    # Process template using the script
+    sed -f "$temp_script" "$template_path" > "$output_path"
+    local sed_status=$?
+
+    # Clean up
+    rm -f "$temp_script"
 
     # Verify output
-    if [ ! -f "$output_path" ]; then
+    if [ $sed_status -ne 0 ] || [ ! -f "$output_path" ]; then
         echo "ERROR: Failed to generate output file: $output_path"
+        echo "sed exit status: $sed_status"
         exit 1
     fi
 
