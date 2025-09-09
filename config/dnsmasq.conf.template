@@ -9,8 +9,7 @@ enable-tftp
 tftp-root=/tftpboot
 
 # TFTP optimizations for large files
-tftp-blocksize=8192
-tftp-no-blocksize=no
+tftp-block-size=8192
 tftp-max-failures=100
 tftp-mtu=1500
 

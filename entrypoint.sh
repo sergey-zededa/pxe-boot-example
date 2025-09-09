@@ -273,7 +273,15 @@ EOL
     # Debug logging if requested
     [ "$LOG_LEVEL" = "debug" ] && echo -e "\n# Debug Logging\nlog-queries\nlog-dhcp" >> /etc/dnsmasq.conf
 
-    echo "dnsmasq configuration generated successfully"
+    # Validate configuration
+    echo "Validating dnsmasq configuration..."
+    if ! dnsmasq --test --conf-file=/etc/dnsmasq.conf; then
+        echo "ERROR: dnsmasq configuration validation failed"
+        echo "Current configuration:"
+        cat /etc/dnsmasq.conf
+        exit 1
+    fi
+    echo "dnsmasq configuration generated and validated successfully"
 }
 
 # Function to set up directory structure and permissions
