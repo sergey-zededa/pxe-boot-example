@@ -2,6 +2,43 @@
 # Exit on any error
 set -e
 
+# Function to process configuration templates
+process_template() {
+    local template_path=$1
+    local output_path=$2
+    local template_name=$(basename "$template_path")
+    local variables=$3
+
+    # Check template existence
+    if [ ! -f "$template_path" ]; then
+        echo "ERROR: Template $template_name not found!"
+        exit 1
+    fi
+
+    echo "Processing template: $template_name"
+    echo "Output path: $output_path"
+
+    # Create sed command with all variable substitutions
+    local sed_cmd="sed"
+    echo "$variables" | while IFS='=' read -r key value; do
+        if [ -n "$key" ]; then
+            sed_cmd="$sed_cmd -e 's/{{$key}}/$value/g'"
+        fi
+    done
+
+    # Process template
+    echo "Applying variable substitutions..."
+    eval "$sed_cmd '$template_path' > '$output_path'"
+
+    # Verify output
+    if [ ! -f "$output_path" ]; then
+        echo "ERROR: Failed to generate output file: $output_path"
+        exit 1
+    fi
+
+    echo "Successfully processed $template_name"
+}
+
 # Function to print usage information
 print_usage() {
     cat << EOF
@@ -198,9 +235,33 @@ validate_environment() {
 # Function to generate autoexec.ipxe
 generate_autoexec() {
     printf "Generating autoexec.ipxe...\n"
-    sed "s/{{SERVER_IP}}/${SERVER_IP}/g" /config/autoexec.ipxe.template > /tftpboot/autoexec.ipxe
+    process_template \
+        "/config/autoexec.ipxe.template" \
+        "/tftpboot/autoexec.ipxe" \
+        "SERVER_IP=${SERVER_IP}"
     chmod 644 /tftpboot/autoexec.ipxe
     chown dnsmasq:dnsmasq /tftpboot/autoexec.ipxe
+}
+
+# Function to generate nginx configuration
+generate_nginx_conf() {
+    printf "Generating nginx configuration...\n"
+
+    # Process template
+    process_template \
+        "/config/nginx.conf.template" \
+        "/etc/nginx/nginx.conf" \
+        "DEBUG=${DEBUG}"
+
+    # Validate configuration
+    echo "Validating nginx configuration..."
+    if ! nginx -t; then
+        echo "ERROR: nginx configuration validation failed"
+        echo "Current configuration:"
+        cat /etc/nginx/nginx.conf
+        exit 1
+    fi
+    echo "nginx configuration generated and validated successfully"
 }
 
 # Function to generate dnsmasq configuration
@@ -335,9 +396,12 @@ setup_eve_versions() {
             # Set up directory structure
             mkdir -p "/data/httpboot/${version}/EFI/BOOT/"
 
-            # Generate version-specific GRUB configuration
-            sed "s/{{SERVER_IP}}/${SERVER_IP}/g; s/{{VERSION}}/${version}/g" \
-                /config/grub.cfg.template > "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
+# Generate version-specific GRUB configuration
+            process_template \
+                "/config/grub.cfg.template" \
+                "/data/httpboot/${version}/EFI/BOOT/grub.cfg" \
+                "SERVER_IP=${SERVER_IP}
+VERSION=${version}"
             chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
             chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
 
@@ -622,9 +686,12 @@ generate_version_config() {
     # Create version directory if it doesn't exist
     mkdir -p "/data/httpboot/${version}"
 
-    # Generate version-specific ipxe.efi.cfg from template
-    sed "s/{{SERVER_IP}}/${SERVER_IP}/g; s/{{VERSION}}/${version}/g" \
-        /config/ipxe.efi.cfg.template > "/data/httpboot/${version}/ipxe.efi.cfg"
+# Generate version-specific ipxe.efi.cfg from template
+    process_template \
+        "/config/ipxe.efi.cfg.template" \
+        "/data/httpboot/${version}/ipxe.efi.cfg" \
+        "SERVER_IP=${SERVER_IP}
+VERSION=${version}"
 
     echo "Generated iPXE config for version ${version}"
 }

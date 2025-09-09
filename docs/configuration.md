@@ -63,16 +63,28 @@ The NGINX configuration is managed through `config/nginx.conf`.
 ```
 config/
   ├── dnsmasq.conf.template    # DNSMASQ configuration template
-  ├── nginx.conf              # NGINX configuration
+  ├── nginx.conf.template      # NGINX configuration template
   ├── autoexec.ipxe.template  # iPXE autoexec template
+  ├── boot.ipxe.template      # iPXE boot menu template
+  ├── ipxe.efi.cfg.template   # iPXE EFI configuration template
   └── grub.cfg.template       # GRUB configuration template
 ```
 
 ### Processing Functions:
 
-The `entrypoint.sh` script contains functions for processing each type of configuration:
+The `entrypoint.sh` script contains the following template processing functions:
+
+#### Core Processing:
+- `process_template()`: Common template processing function
+  * Handles variable substitution
+  * Validates template existence
+  * Verifies output generation
+
+#### Service-specific Generators:
 - `generate_dnsmasq_conf()`: Process DNSMASQ configuration
-- (List other configuration generators)
+- `generate_nginx_conf()`: Process NGINX configuration
+- `generate_autoexec()`: Generate iPXE autoexec script
+- `generate_version_config()`: Generate version-specific iPXE config
 
 ### Error Handling:
 - Missing templates are treated as fatal errors
