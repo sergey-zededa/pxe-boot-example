@@ -20,14 +20,22 @@ process_template() {
 
     # Create sed command with all variable substitutions
     local sed_cmd="sed"
-    echo "$variables" | while IFS='=' read -r key value; do
-        if [ -n "$key" ]; then
-            sed_cmd="$sed_cmd -e 's/{{$key}}/$value/g'"
-        fi
-    done
+
+    # Only attempt substitutions if variables are provided
+    if [ -n "$variables" ]; then
+        echo "Applying variable substitutions:"
+        # Support multi-line VARS input (key=value per line)
+        echo "$variables" | while IFS='=' read -r key value; do
+            if [ -n "$key" ]; then
+                echo "  - $key=$value"
+                sed_cmd="$sed_cmd -e 's/{{$key}}/$value/g'"
+            fi
+        done
+    else
+        echo "No variables provided; copying template as-is"
+    fi
 
     # Process template
-    echo "Applying variable substitutions..."
     eval "$sed_cmd '$template_path' > '$output_path'"
 
     # Verify output
@@ -867,13 +875,16 @@ generate_version_config() {
         echo "ERROR: Generated config missing required iPXE header!"
         exit 1
     fi
-    # next-server may be a literal IP or templated variable; accept either
-    if ! grep -E -q "set next-server ((${SERVER_IP})|\${next-server})" "/data/httpboot/${version}/ipxe.efi.cfg"; then
+    # Check for next-server setting (either literal IP or variable)
+    if ! grep -E -q "set next-server (${SERVER_IP}|\\\${next-server})" "/data/httpboot/${version}/ipxe.efi.cfg"; then
         echo "WARNING: next-server not set in generated config"
+        echo "Looking for either '${SERVER_IP}' or '\${next-server}'"
     fi
-    # boot-url may use the next-server variable; accept both forms
-    if ! grep -E -q "set boot-url http://((${SERVER_IP})|\${next-server})/${version}" "/data/httpboot/${version}/ipxe.efi.cfg"; then
+
+    # Check for boot-url setting (using either form)
+    if ! grep -E -q "set boot-url http://(${SERVER_IP}|\\\${next-server})/${version}" "/data/httpboot/${version}/ipxe.efi.cfg"; then
         echo "WARNING: Boot URL variable injection may have failed"
+        echo "Looking for URL with either '${SERVER_IP}' or '\${next-server}'"
     fi
 
     echo "Successfully generated iPXE config for version ${version}"
