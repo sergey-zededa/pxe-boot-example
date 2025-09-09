@@ -280,18 +280,38 @@ EOL
 setup_directories() {
     echo "Setting up directory structure and permissions..."
     
-    # Create required directories with proper permissions
+    # Create base directories
+    echo "Creating base directories..."
     mkdir -p /data/httpboot /data/downloads /tftpboot
     
-    # Set ownership and permissions for directories
+    # Create standard directory structure for /data/httpboot
+    echo "Creating httpboot directory structure..."
+    mkdir -p /data/httpboot/latest
+    mkdir -p /data/httpboot/latest/EFI/BOOT
+    
+    # Set up TFTP directory structure
+    echo "Creating TFTP directory structure..."
+    mkdir -p /tftpboot
+    
+    # Set base directory permissions
+    echo "Setting base directory permissions..."
     chown -R www-data:www-data /data/httpboot
-    chmod 755 /data/httpboot
+    find /data/httpboot -type d -exec chmod 755 {} \;
     
     chown -R dnsmasq:dnsmasq /tftpboot
-    chmod 755 /tftpboot
+    find /tftpboot -type d -exec chmod 755 {} \;
     
     chown -R www-data:www-data /data/downloads
-    chmod 755 /data/downloads
+    find /data/downloads -type d -exec chmod 755 {} \;
+    
+    # Create version template directory structure
+    echo "Creating version template structure..."
+    mkdir -p /data/template/EFI/BOOT
+    chown -R www-data:www-data /data/template
+    chmod 755 /data/template
+    find /data/template -type d -exec chmod 755 {} \;
+    
+    echo "Directory structure setup complete"
 }
 
 # Function to set up EVE-OS versions
@@ -448,41 +468,65 @@ fi
             DEFAULT_VERSION=$version
             echo "Setting ${version} as default version"
             
-            # Set up TFTP boot files
-            cp "/data/httpboot/${DEFAULT_VERSION}/ipxe.efi" /tftpboot/ipxe.efi
-            chown dnsmasq:dnsmasq /tftpboot/ipxe.efi
-            chmod 644 /tftpboot/ipxe.efi
+            echo "Setting up TFTP boot files..."
+            # Copy and configure TFTP boot files
+            if [ -f "/data/httpboot/${DEFAULT_VERSION}/ipxe.efi" ]; then
+                echo "Setting up UEFI TFTP boot file..."
+                cp "/data/httpboot/${DEFAULT_VERSION}/ipxe.efi" /tftpboot/ipxe.efi
+                chown dnsmasq:dnsmasq /tftpboot/ipxe.efi
+                chmod 644 /tftpboot/ipxe.efi
+            else
+                echo "Warning: ipxe.efi not found in version ${DEFAULT_VERSION}"
+            fi
             
-            echo "Creating 'latest' directory with files from ${version}..."
+            echo "Setting up latest version symlink..."
+            # Create latest directory structure
             rm -rf "/data/httpboot/latest"
             mkdir -p "/data/httpboot/latest"
             
-            # Copy files to latest directory
-            cd "/data/httpboot/${version}" && find . -type f -exec cp --parents {} "/data/httpboot/latest/" \;
-            
-            # Ensure correct ownership and permissions
-            chown -R www-data:www-data "/data/httpboot/latest"
-            find "/data/httpboot/latest" -type f -exec chmod 644 {} \;
-            find "/data/httpboot/latest" -type d -exec chmod 755 {} \;
-            
-            echo "Created and configured 'latest' directory"
-            
-            # Verify latest directory
-            echo "\nVerifying 'latest' directory structure:"
-            ls -laR "/data/httpboot/latest/" || echo "Failed to list 'latest' directory"
-            
-            if [ -f "/data/httpboot/latest/EFI/BOOT/BOOTX64.EFI" ]; then
-                echo "✓ BOOTX64.EFI is present in 'latest' directory"
-            else
-                echo "✗ WARNING: BOOTX64.EFI is missing from 'latest' directory!"
+            # Use rsync to copy files while preserving structure
+            echo "Copying files to latest directory..."
+            if ! rsync -av --delete "/data/httpboot/${version}/" "/data/httpboot/latest/"; then
+                echo "Warning: Error during file copy to latest directory"
+                # Fallback to cp if rsync fails
+                cd "/data/httpboot/${version}" && find . -type f -exec cp --parents {} "/data/httpboot/latest/" \;
             fi
             
-            # Extra verification step
-            echo "\nVerifying file access:"
-            if su -s /bin/sh www-data -c "test -r /data/httpboot/latest/ipxe.efi.cfg"; then
-                echo "✓ www-data can read ipxe.efi.cfg in latest directory"
+            # Set correct ownership and permissions
+            echo "Setting latest directory permissions..."
+            set_file_permissions
+            
+            # Verify latest directory structure
+            echo "\nVerifying latest directory structure:"
+            VERIFY_ERRORS=0
+            
+            # Check required files and permissions
+            for file in "EFI/BOOT/BOOTX64.EFI" "ipxe.efi.cfg" "ipxe.efi"; do
+                if [ -f "/data/httpboot/latest/${file}" ]; then
+                    echo "✓ ${file} is present"
+                    if su -s /bin/sh www-data -c "test -r /data/httpboot/latest/${file}"; then
+                        echo "✓ ${file} is readable by www-data"
+                    else
+                        echo "✗ WARNING: ${file} is not readable by www-data"
+                        VERIFY_ERRORS=$((VERIFY_ERRORS + 1))
+                    fi
+                else
+                    echo "✗ WARNING: ${file} is missing"
+                    VERIFY_ERRORS=$((VERIFY_ERRORS + 1))
+                fi
+            done
+            
+            # Check directory permissions
+            if [ ! -x "/data/httpboot/latest" ] || [ ! -x "/data/httpboot/latest/EFI" ] || [ ! -x "/data/httpboot/latest/EFI/BOOT" ]; then
+                echo "✗ WARNING: One or more directories are not executable"
+                VERIFY_ERRORS=$((VERIFY_ERRORS + 1))
+            fi
+            
+            # Report verification results
+            if [ "$VERIFY_ERRORS" -eq 0 ]; then
+                echo "\n✓ Latest directory verification completed successfully"
             else
-                echo "✗ WARNING: www-data cannot read ipxe.efi.cfg in latest directory!"
+                echo "\n✗ Latest directory verification completed with ${VERIFY_ERRORS} errors"
             fi
         fi
 
@@ -532,18 +576,61 @@ done
 
 # Function to set file permissions
 set_file_permissions() {
-    echo "Setting final file permissions..."
-    
-    # Set permissions for boot menu and configuration files
-    chown www-data:www-data /data/httpboot/boot.ipxe
-    chmod 644 /data/httpboot/boot.ipxe
-    
-    find /data/httpboot -name "ipxe.efi.cfg" -exec chown www-data:www-data {} \;
-    find /data/httpboot -name "ipxe.efi.cfg" -exec chmod 644 {} \;
-    
-    # Set permissions for TFTP files
-    find /tftpboot -type f -exec chown dnsmasq:dnsmasq {} \;
-    find /tftpboot -type f -exec chmod 644 {} \;
+    local version=$1
+    echo "Setting file permissions..."
+
+    if [ -n "$version" ]; then
+        echo "Setting permissions for version ${version}..."
+        # Version-specific files
+        if [ -d "/data/httpboot/${version}" ]; then
+            echo "Setting version directory permissions..."
+            chown -R www-data:www-data "/data/httpboot/${version}"
+            find "/data/httpboot/${version}" -type d -exec chmod 755 {} \;
+            find "/data/httpboot/${version}" -type f -exec chmod 644 {} \;
+
+            # Special handling for EFI files
+            if [ -d "/data/httpboot/${version}/EFI/BOOT" ]; then
+                echo "Setting EFI directory permissions..."
+                chmod 755 "/data/httpboot/${version}/EFI" "/data/httpboot/${version}/EFI/BOOT"
+                [ -f "/data/httpboot/${version}/EFI/BOOT/BOOTX64.EFI" ] && chmod 644 "/data/httpboot/${version}/EFI/BOOT/BOOTX64.EFI"
+            fi
+
+            # Set iPXE config permissions
+            echo "Setting iPXE config permissions..."
+            find "/data/httpboot/${version}" -name "ipxe.efi.cfg" -exec chmod 644 {} \;
+            find "/data/httpboot/${version}" -name "*.ipxe" -exec chmod 644 {} \;
+        fi
+    else
+        echo "Setting global file permissions..."
+        # Global boot menu
+        if [ -f "/data/httpboot/boot.ipxe" ]; then
+            echo "Setting boot menu permissions..."
+            chown www-data:www-data /data/httpboot/boot.ipxe
+            chmod 644 /data/httpboot/boot.ipxe
+        fi
+
+        # TFTP files
+        echo "Setting TFTP file permissions..."
+        find /tftpboot -type f -exec chown dnsmasq:dnsmasq {} \;
+        find /tftpboot -type f -exec chmod 644 {} \;
+
+        # Latest directory
+        if [ -d "/data/httpboot/latest" ]; then
+            echo "Setting latest directory permissions..."
+            chown -R www-data:www-data "/data/httpboot/latest"
+            find "/data/httpboot/latest" -type d -exec chmod 755 {} \;
+            find "/data/httpboot/latest" -type f -exec chmod 644 {} \;
+        fi
+
+        # iPXE configs (global)
+        echo "Setting global iPXE config permissions..."
+        find /data/httpboot -name "ipxe.efi.cfg" -exec chown www-data:www-data {} \;
+        find /data/httpboot -name "ipxe.efi.cfg" -exec chmod 644 {} \;
+        find /data/httpboot -name "*.ipxe" -exec chown www-data:www-data {} \;
+        find /data/httpboot -name "*.ipxe" -exec chmod 644 {} \;
+    fi
+
+    echo "File permissions updated successfully"
 }
 
 # Function to generate version-specific iPXE config
