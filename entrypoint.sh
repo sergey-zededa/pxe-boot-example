@@ -126,11 +126,32 @@ validate_environment() {
                 validate_ip "$DHCP_RANGE_START" "DHCP_RANGE_START" || has_error=1
                 validate_ip "$DHCP_RANGE_END" "DHCP_RANGE_END" || has_error=1
                 validate_ip "$DHCP_ROUTER" "DHCP_ROUTER" || has_error=1
+
+                # Verify DHCP range is valid
+                start_num=$(echo "$DHCP_RANGE_START" | awk -F. '{print ($1 * 256^3) + ($2 * 256^2) + ($3 * 256) + $4}')
+                end_num=$(echo "$DHCP_RANGE_END" | awk -F. '{print ($1 * 256^3) + ($2 * 256^2) + ($3 * 256) + $4}')
+                if [ "$start_num" -gt "$end_num" ]; then
+                    echo "Error: DHCP_RANGE_START ($DHCP_RANGE_START) is greater than DHCP_RANGE_END ($DHCP_RANGE_END)"
+                    has_error=1
+                fi
+
+                # Verify router is in the same subnet
+                router_network=$(echo "$DHCP_ROUTER" | cut -d. -f1-3)
+                start_network=$(echo "$DHCP_RANGE_START" | cut -d. -f1-3)
+                if [ "$router_network" != "$start_network" ]; then
+                    echo "Warning: DHCP_ROUTER ($DHCP_ROUTER) is not in the same subnet as DHCP_RANGE_START ($DHCP_RANGE_START)"
+                fi
             fi
             ;;
         proxy)
+            # Validate proxy mode requirements
+            NETWORK_ADDRESS=$(echo "${SERVER_IP}" | awk -F. '{print $1"."$2"."$3".0"}')
             if [ -n "$PRIMARY_DHCP_IP" ]; then
                 validate_ip "$PRIMARY_DHCP_IP" "PRIMARY_DHCP_IP" || has_error=1
+                # Verify primary DHCP server is reachable
+                if ! ping -c 1 -W 1 "$PRIMARY_DHCP_IP" >/dev/null 2>&1; then
+                    echo "Warning: PRIMARY_DHCP_IP ($PRIMARY_DHCP_IP) is not responding to ping"
+                fi
             fi
             ;;
         *)
@@ -198,17 +219,29 @@ log-dhcp
 enable-tftp
 tftp-root=/tftpboot
 
+# TFTP optimizations for large files
+tftp-blocksize=8192
+tftp-no-blocksize=no
+tftp-max-failures=100
+tftp-mtu=1500
+
 # Client Detection
-dhcp-match=set:ipxe,175
-dhcp-match=set:efi64,option:client-arch,7
-dhcp-match=set:efi64,option:client-arch,9
+dhcp-match=set:ipxe,175                   # iPXE ROM
+dhcp-match=set:efi64,option:client-arch,7  # EFI x64
+dhcp-match=set:efi64,option:client-arch,9  # EFI x64
+dhcp-match=set:ipxe-ok,option:user-class,iPXE
 
-# Boot configuration
+# Server options
+dhcp-option=66,${SERVER_IP}              # TFTP server
+
+# Boot configuration for BIOS clients
+dhcp-boot=tag:!ipxe,tag:!efi64,undionly.kpxe
+
+# Boot configuration for UEFI clients
 dhcp-boot=tag:!ipxe,tag:efi64,ipxe.efi
-dhcp-boot=tag:ipxe,http://${SERVER_IP}/boot.ipxe
 
-# TFTP server configuration
-dhcp-option=66,${SERVER_IP}
+# Boot configuration for iPXE clients
+dhcp-boot=tag:ipxe,http://${SERVER_IP}/boot.ipxe
 EOL
 
     # DHCP Mode-specific configuration

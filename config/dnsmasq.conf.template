@@ -14,12 +14,14 @@ tftp-no-blocksize=no
 tftp-max-failures=100
 tftp-mtu=1500
 
-# Set next-server explicitly
-dhcp-option=option:tftp-server,{{SERVER_IP}}
-
-# PXE/iPXE detection and boot configuration
-dhcp-match=set:ipxe,175
+# Client detection
+dhcp-match=set:ipxe,175                   # iPXE ROM
+dhcp-match=set:efi64,option:client-arch,7  # EFI x64
+dhcp-match=set:efi64,option:client-arch,9  # EFI x64
 dhcp-match=set:ipxe-ok,option:user-class,iPXE
+
+# Server options
+dhcp-option=66,{{SERVER_IP}}              # TFTP server
 
 {{#if STANDALONE_MODE}}
 # Standalone DHCP Configuration
@@ -33,11 +35,14 @@ dhcp-relay={{PRIMARY_DHCP_IP}}
 {{/if}}
 {{/if}}
 
-# Set HTTP server for iPXE clients
-dhcp-option=tag:ipxe,option:bootfile-name,http://{{SERVER_IP}}/{{DEFAULT_VERSION}}/ipxe.efi.cfg
+# Boot configuration for BIOS clients
+dhcp-boot=tag:!ipxe,tag:!efi64,undionly.kpxe
 
-# Set TFTP server for non-iPXE clients
-dhcp-option=tag:!ipxe,option:bootfile-name,undionly.kpxe
+# Boot configuration for UEFI clients
+dhcp-boot=tag:!ipxe,tag:efi64,ipxe.efi
+
+# Boot configuration for iPXE clients
+dhcp-boot=tag:ipxe,http://{{SERVER_IP}}/boot.ipxe
 
 {{#if DHCP_DOMAIN_NAME}}
 # Domain name configuration
