@@ -8,6 +8,12 @@ log-dhcp
 enable-tftp
 tftp-root=/tftpboot
 
+# TFTP optimizations for large files
+tftp-blocksize=8192
+tftp-no-blocksize=no
+tftp-max-failures=100
+tftp-mtu=1500
+
 # Set next-server explicitly
 dhcp-option=option:tftp-server,{{SERVER_IP}}
 
