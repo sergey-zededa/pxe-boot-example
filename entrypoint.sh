@@ -457,33 +457,89 @@ ensure_version_assets() {
         changed=1
     fi
 
-    # If any of the expected files are missing, try to extract them from installer.iso
-    if [ ! -f "$dir/kernel" ] || [ ! -f "$dir/initrd.img" ] || [ ! -f "$dir/ucode.img" ] || [ ! -f "$dir/rootfs_installer.img" ]; then
-        if [ -f "$dir/installer.iso" ]; then
-            echo "Attempting to extract kernel components from installer.iso for ${version}..."
-            # Try typical EVE ISO paths first (under boot/), then root directory as fallback
-            if 7z x "$dir/installer.iso" -o"$dir" boot/kernel boot/initrd.img ucode.img rootfs.img -y >/dev/null 2>&1 || \
-               7z x "$dir/installer.iso" -o"$dir" kernel initrd.img ucode.img rootfs.img -y >/dev/null 2>&1; then
-                # Move files up if they were under boot/
-                if [ -f "$dir/boot/kernel" ]; then
-                    mv "$dir/boot/kernel" "$dir/kernel" || true
-                fi
-                if [ -f "$dir/boot/initrd.img" ]; then
-                    mv "$dir/boot/initrd.img" "$dir/initrd.img" || true
-                fi
-                # If rootfs.img appeared, standardize the name
-                if [ -f "$dir/rootfs.img" ] && [ ! -f "$dir/rootfs_installer.img" ]; then
-                    mv "$dir/rootfs.img" "$dir/rootfs_installer.img" || true
-                fi
-                # Clean up empty directories that may have been created by 7z
-                rmdir "$dir/boot" 2>/dev/null || true
-                changed=1
-            else
-                echo "Warning: Failed to extract kernel assets from installer.iso for ${version}"
+    # Always try to extract missing files from installer.iso if it exists
+    if [ -f "$dir/installer.iso" ]; then
+        echo "Extracting missing kernel components from installer.iso for ${version}..."
+        
+        # Create temporary directory for ISO extraction
+        local temp_iso_dir="$dir/temp_iso_extract"
+        mkdir -p "$temp_iso_dir"
+        
+        # Extract all relevant files from ISO
+        echo "Extracting files from installer.iso..."
+        if 7z x "$dir/installer.iso" -o"$temp_iso_dir" -y >/dev/null 2>&1; then
+            echo "ISO extraction successful, locating required files..."
+            
+            # Find and copy kernel if missing
+            if [ ! -f "$dir/kernel" ]; then
+                for kernel_path in "$temp_iso_dir/boot/kernel" "$temp_iso_dir/kernel" "$temp_iso_dir/vmlinuz" "$temp_iso_dir/boot/vmlinuz"; do
+                    if [ -f "$kernel_path" ]; then
+                        echo "Found kernel at: $kernel_path"
+                        cp "$kernel_path" "$dir/kernel"
+                        changed=1
+                        break
+                    fi
+                done
             fi
+            
+            # Find and copy initrd if missing
+            if [ ! -f "$dir/initrd.img" ]; then
+                for initrd_path in "$temp_iso_dir/boot/initrd.img" "$temp_iso_dir/initrd.img" "$temp_iso_dir/boot/initrd" "$temp_iso_dir/initrd"; do
+                    if [ -f "$initrd_path" ]; then
+                        echo "Found initrd at: $initrd_path"
+                        cp "$initrd_path" "$dir/initrd.img"
+                        changed=1
+                        break
+                    fi
+                done
+            fi
+            
+            # Find and copy ucode.img if missing
+            if [ ! -f "$dir/ucode.img" ]; then
+                for ucode_path in "$temp_iso_dir/ucode.img" "$temp_iso_dir/boot/ucode.img" "$temp_iso_dir/microcode.img"; do
+                    if [ -f "$ucode_path" ]; then
+                        echo "Found ucode at: $ucode_path"
+                        cp "$ucode_path" "$dir/ucode.img"
+                        changed=1
+                        break
+                    fi
+                done
+            fi
+            
+            # Find and copy rootfs_installer.img if missing
+            if [ ! -f "$dir/rootfs_installer.img" ]; then
+                for rootfs_path in "$temp_iso_dir/rootfs_installer.img" "$temp_iso_dir/rootfs.img" "$temp_iso_dir/boot/rootfs.img" "$temp_iso_dir/live/filesystem.squashfs"; do
+                    if [ -f "$rootfs_path" ]; then
+                        echo "Found rootfs at: $rootfs_path"
+                        cp "$rootfs_path" "$dir/rootfs_installer.img"
+                        changed=1
+                        break
+                    fi
+                done
+            fi
+            
         else
-            echo "Warning: ${dir}/installer.iso not found; cannot extract kernel assets"
+            echo "Warning: Failed to extract installer.iso for ${version}"
         fi
+        
+        # Clean up temporary extraction directory
+        rm -rf "$temp_iso_dir"
+        
+    else
+        echo "Warning: ${dir}/installer.iso not found; cannot extract additional assets"
+    fi
+    
+    # Create empty placeholder files for any still missing optional files to prevent 404 errors
+    if [ ! -f "$dir/ucode.img" ]; then
+        echo "Creating empty ucode.img placeholder to prevent 404 errors"
+        touch "$dir/ucode.img"
+        changed=1
+    fi
+    
+    if [ ! -f "$dir/rootfs_installer.img" ]; then
+        echo "Creating empty rootfs_installer.img placeholder to prevent 404 errors"
+        touch "$dir/rootfs_installer.img"
+        changed=1
     fi
 
     # Ensure permissions on any (new) files
