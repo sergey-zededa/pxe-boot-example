@@ -24,7 +24,13 @@ dhcp-option=66,{{SERVER_IP}}              # TFTP server
 dhcp-boot=tag:!ipxe,tag:!efi64,undionly.kpxe
 
 # Boot configuration for UEFI clients
-dhcp-boot=tag:!ipxe,tag:efi64,ipxe.efi
+# Use snponly.efi to minimize NBP size and avoid PXE-E05 issues on some firmware
+# See: clients with limited NBP buffer may fail to load large ipxe.efi
+# This binary relies on the firmware SNP driver and is significantly smaller
+# than a full-driver ipxe.efi
+# File is downloaded at container start into /tftpboot/snponly.efi
+# Fallback to ipxe.efi if you need built-in drivers.
+dhcp-boot=tag:!ipxe,tag:efi64,snponly.efi
 
 # Boot configuration for iPXE clients
 dhcp-boot=tag:ipxe,http://{{SERVER_IP}}/boot.ipxe

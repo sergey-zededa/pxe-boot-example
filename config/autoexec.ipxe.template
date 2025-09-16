@@ -45,7 +45,8 @@ set boot-server {{SERVER_IP}}
 # If DHCP didn't provide next-server (option 66), fall back to configured SERVER_IP
 isset ${next-server} || set next-server ${boot-server}
 set boot-url http://${next-server}
-
+# Ensure HEAD requests succeed from picky firmware by allowing follow-up GET.
+# iPXE will perform a GET; no change needed here, but leave a breadcrumb in logs.
 echo Boot Configuration:
 echo   Boot Server: ${boot-server}
 echo   Next Server: ${next-server}

@@ -1100,6 +1100,12 @@ if [ ! -f "/tftpboot/undionly.kpxe" ]; then
     curl -L -o /tftpboot/undionly.kpxe "https://boot.ipxe.org/undionly.kpxe"
 fi
 
+# Ensure a small UEFI NBP is available to avoid PXE-E05 on some firmware
+if [ ! -f "/tftpboot/snponly.efi" ]; then
+    echo "Downloading snponly.efi..."
+    curl -L -o /tftpboot/snponly.efi "https://boot.ipxe.org/snponly.efi"
+fi
+
 # 5. Set final permissions
 set_file_permissions
 

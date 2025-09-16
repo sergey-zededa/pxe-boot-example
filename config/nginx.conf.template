@@ -87,7 +87,6 @@ http {
         location ~* \.ipxe$ {
             default_type application/x-ipxe;
             add_header Content-Type application/x-ipxe always;
-            add_header Content-Length $content_length always;
             expires -1;
             tcp_nodelay on;
             keepalive_timeout 60;
@@ -97,7 +96,6 @@ http {
         location ~* \.efi$ {
             default_type application/x-pxeboot;
             add_header Content-Type application/x-pxeboot always;
-            add_header Content-Length $content_length always;
             sendfile on;
             tcp_nopush on;
             tcp_nodelay on;
@@ -120,7 +118,6 @@ http {
         location ~* \.cfg$ {
             default_type application/octet-stream;
             add_header Content-Type application/octet-stream always;
-            add_header Content-Length $content_length always;
             sendfile on;
             tcp_nopush on;
             tcp_nodelay on;
@@ -143,7 +140,6 @@ http {
         location ~* \.(img|iso)$ {
             default_type application/octet-stream;
             add_header Content-Type application/octet-stream always;
-            add_header Content-Length $content_length always;
             sendfile on;
             tcp_nopush on;
             tcp_nodelay on;
