@@ -37,10 +37,6 @@ dhcp-boot=tag:!ipxe,tag:efi64,snponly.efi,,{{SERVER_IP}}
 # Boot configuration for iPXE clients (HTTP chain)
 dhcp-boot=tag:ipxe,http://{{SERVER_IP}}/boot.ipxe
 
-# Advertise PXE service menu entries (optional but improves compatibility)
-pxe-service=tag:efi64,"PXE UEFI x64 (iPXE)",snponly.efi
-pxe-service=tag:!efi64,"PXE BIOS (iPXE)",undionly.kpxe
-
 # Optional domain name configuration
 {{DOMAIN_CONFIG}}
 
