@@ -473,33 +473,27 @@ setup_eve_versions() {
                 exit 1
             fi
 
-            # List contents for debugging
-            echo "Archive contents:"
-            ls -la "${TEMP_DIR}"
+            # After extracting the tar, extract kernel assets from the ISO
+            iso_path="/data/httpboot/${version}/installer.iso"
+            extract_dir="/data/httpboot/${version}"
+            if [ -f "$iso_path" ]; then
+                echo "Extracting kernel components from $iso_path..."
+                # Use 7z to extract the required files, overwriting if they exist
+                # The rootfs.img will be renamed later in the script
+                7z x "$iso_path" -o"$extract_dir" kernel ucode.img initrd.img rootfs.img -y
+            else
+                echo "Warning: installer.iso not found for version ${version}. Cannot extract kernel assets."
+            fi
 
             # Set up directory structure
             mkdir -p "/data/httpboot/${version}/EFI/BOOT/"
 
-# Generate version-specific GRUB configuration
-            process_template \
-                "/config/grub.cfg.template" \
-                "/data/httpboot/${version}/EFI/BOOT/grub.cfg" \
-                "SERVER_IP=${SERVER_IP}
-VERSION=${version}"
-            chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
             chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
 
             # Handle EFI-related files first
             if [ -f "${TEMP_DIR}/EFI/BOOT/BOOTX64.EFI" ]; then
                 echo "Copying EFI boot files..."
                 cp -r "${TEMP_DIR}/EFI" "/data/httpboot/${version}/"
-                # Overwrite upstream grub.cfg with our controlled template to avoid drift
-                process_template \
-                    "/config/grub.cfg.template" \
-                    "/data/httpboot/${version}/EFI/BOOT/grub.cfg" \
-                    "SERVER_IP=${SERVER_IP}
-VERSION=${version}"
-                chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
                 chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
             elif [ -f "${TEMP_DIR}/installer.iso" ]; then
                 echo "Found installer.iso, extracting EFI files..."
@@ -509,13 +503,6 @@ VERSION=${version}"
                     if [ -f "${ISO_EXTRACT_DIR}/EFI/BOOT/BOOTX64.EFI" ]; then
                         echo "Copying EFI files from ISO..."
                         cp -r "${ISO_EXTRACT_DIR}/EFI" "/data/httpboot/${version}/"
-                        # Overwrite upstream grub.cfg with our controlled template
-                        process_template \
-                            "/config/grub.cfg.template" \
-                            "/data/httpboot/${version}/EFI/BOOT/grub.cfg" \
-                            "SERVER_IP=${SERVER_IP}
-VERSION=${version}"
-                        chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
                         chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
                     else
                         echo "Warning: No EFI/BOOT/BOOTX64.EFI found in ISO"
@@ -659,15 +646,6 @@ fi
             echo "Setting latest directory permissions..."
             set_file_permissions
 
-            # Ensure latest has our GRUB stub (overwrite if upstream copied one)
-            if [ -d "/data/httpboot/latest/EFI/BOOT" ]; then
-                process_template \
-                    "/config/grub.cfg.template" \
-                    "/data/httpboot/latest/EFI/BOOT/grub.cfg" \
-                    "SERVER_IP=${SERVER_IP}
-VERSION=${version}"
-                chown www-data:www-data "/data/httpboot/latest/EFI/BOOT/grub.cfg"
-                chmod 644 "/data/httpboot/latest/EFI/BOOT/grub.cfg"
             fi
             
             # Verify latest directory structure
@@ -704,15 +682,6 @@ VERSION=${version}"
             fi
         fi
 
-        # Ensure our GRUB stub is in place even for cached versions
-        if [ -d "/data/httpboot/${version}/EFI/BOOT" ]; then
-            process_template \
-                "/config/grub.cfg.template" \
-                "/data/httpboot/${version}/EFI/BOOT/grub.cfg" \
-                "SERVER_IP=${SERVER_IP}
-VERSION=${version}"
-            chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
-            chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
         fi
 
         # Update ipxe.efi.cfg with correct URL
@@ -723,27 +692,26 @@ VERSION=${version}"
 cat > "/data/httpboot/${version}/ipxe.efi.cfg" <<- EOF
 #!ipxe
 
-dhcp
-
-# Set boot parameters (pin server IP; ignore DHCP next-server)
+# Set boot parameters
 set url http://${SERVER_IP}/${version}/
 set next-server ${SERVER_IP}
-set console console=ttyS0 console=ttyS1 console=ttyS2 console=ttyAMA0 console=ttyAMA1 console=tty0
+
+# Define kernel arguments
+set console console=ttyS0 console=tty0
 set eve_args eve_soft_serial=\${mac:hexhyp} eve_reboot_after_install getty
 set installer_args root=/initrd.image find_boot=netboot overlaytmpfs fastboot
 
 # Hardware-specific console settings
-iseq \${smbios/manufacturer} Huawei && set console console=ttyAMA0,115200n8 ||
-iseq \${smbios/manufacturer} Huawei && set platform_tweaks pcie_aspm=off pci=pcie_bus_perf ||
-iseq \${smbios/manufacturer} Supermicro && set console console=ttyS1,115200n8 ||
 iseq \${smbios/manufacturer} QEMU && set console console=hvc0 console=ttyS0 ||
 
-# Chain to appropriate bootloader
-iseq \${buildarch} x86_64 && chain \${url}EFI/BOOT/BOOTX64.EFI ||
-iseq \${buildarch} arm64 && chain \${url}EFI/BOOT/BOOTAA64.EFI ||
-iseq \${buildarch} riscv64 && chain \${url}EFI/BOOT/BOOTRISCV64.EFI ||
+# Load kernel and initrd images directly
+kernel \${url}kernel \${console} \${eve_args} \${installer_args}
+initrd \${url}ucode.img
+initrd \${url}initrd.img
+initrd \${url}rootfs_installer.img
 
-boot
+# Boot the loaded kernel
+boot || goto chain_error
 EOF
     sed -i "s|^#\s*set url.*|set url http://${SERVER_IP}/${version}/|; s|^\s*set url.*|set url http://${SERVER_IP}/${version}/|" "/data/httpboot/${version}/ipxe.efi.cfg"
 
@@ -935,7 +903,7 @@ item --gap Server IP: ${SERVER_IP}
 item --gap Client IP: ${net0/ip}
 item --gap Architecture: ${buildarch}
 
-choose --timeout ${BOOT_MENU_TIMEOUT}000 --default eve_1 selected || goto menu_error
+choose --timeout 10000 --default eve_1 selected || goto menu_error
 goto ${selected}
 
 :retry_dhcp_fail
