@@ -440,6 +440,69 @@ setup_directories() {
     echo "Directory structure setup complete"
 }
 
+# Ensure version directory contains kernel/initrd/ucode/rootfs_installer assets.
+# If missing and installer.iso exists, attempt extraction from common ISO paths.
+ensure_version_assets() {
+    local version="$1"
+    local dir="/data/httpboot/${version}"
+    local changed=0
+
+    [ -d "$dir" ] || return 0
+
+    echo "Ensuring kernel assets for ${version}..."
+
+    # If rootfs_installer.img is missing but rootfs.img is present, rename it
+    if [ ! -f "$dir/rootfs_installer.img" ] && [ -f "$dir/rootfs.img" ]; then
+        mv "$dir/rootfs.img" "$dir/rootfs_installer.img"
+        changed=1
+    fi
+
+    # If any of the expected files are missing, try to extract them from installer.iso
+    if [ ! -f "$dir/kernel" ] || [ ! -f "$dir/initrd.img" ] || [ ! -f "$dir/ucode.img" ] || [ ! -f "$dir/rootfs_installer.img" ]; then
+        if [ -f "$dir/installer.iso" ]; then
+            echo "Attempting to extract kernel components from installer.iso for ${version}..."
+            # Try typical EVE ISO paths first (under boot/), then root directory as fallback
+            if 7z x "$dir/installer.iso" -o"$dir" boot/kernel boot/initrd.img ucode.img rootfs.img -y >/dev/null 2>&1 || \
+               7z x "$dir/installer.iso" -o"$dir" kernel initrd.img ucode.img rootfs.img -y >/dev/null 2>&1; then
+                # Move files up if they were under boot/
+                if [ -f "$dir/boot/kernel" ]; then
+                    mv "$dir/boot/kernel" "$dir/kernel" || true
+                fi
+                if [ -f "$dir/boot/initrd.img" ]; then
+                    mv "$dir/boot/initrd.img" "$dir/initrd.img" || true
+                fi
+                # If rootfs.img appeared, standardize the name
+                if [ -f "$dir/rootfs.img" ] && [ ! -f "$dir/rootfs_installer.img" ]; then
+                    mv "$dir/rootfs.img" "$dir/rootfs_installer.img" || true
+                fi
+                # Clean up empty directories that may have been created by 7z
+                rmdir "$dir/boot" 2>/dev/null || true
+                changed=1
+            else
+                echo "Warning: Failed to extract kernel assets from installer.iso for ${version}"
+            fi
+        else
+            echo "Warning: ${dir}/installer.iso not found; cannot extract kernel assets"
+        fi
+    fi
+
+    # Ensure permissions on any (new) files
+    if [ "$changed" -eq 1 ]; then
+        chown -R www-data:www-data "$dir"
+        find "$dir" -type f -exec chmod 644 {} \;
+        find "$dir" -type d -exec chmod 755 {} \;
+    fi
+
+    # Final report
+    for f in kernel initrd.img ucode.img rootfs_installer.img; do
+        if [ -f "$dir/$f" ]; then
+            echo "✓ ${version}/$f present"
+        else
+            echo "✗ WARNING: ${version}/$f missing"
+        fi
+    done
+}
+
 # Function to set up EVE-OS versions
 setup_eve_versions() {
     echo "Setting up EVE-OS versions..."
@@ -473,14 +536,28 @@ setup_eve_versions() {
                 exit 1
             fi
 
-            # After extracting the tar, extract kernel assets from the ISO
+            # After extracting the tar, copy all files we know about into the target dir
+            # Some archives already contain kernel/initrd at top-level; copy if present
+            for f in kernel initrd.img ucode.img rootfs.img installer.iso EFI; do
+                if [ -e "${TEMP_DIR}/$f" ]; then
+                    echo "Copying $f from archive..."
+                    cp -r "${TEMP_DIR}/$f" "/data/httpboot/${version}/"
+                fi
+            done
+
+            # Attempt to extract kernel assets from installer.iso as a fallback
             iso_path="/data/httpboot/${version}/installer.iso"
             extract_dir="/data/httpboot/${version}"
             if [ -f "$iso_path" ]; then
-                echo "Extracting kernel components from $iso_path..."
-                # Use 7z to extract the required files, overwriting if they exist
-                # The rootfs.img will be renamed later in the script
-                7z x "$iso_path" -o"$extract_dir" kernel ucode.img initrd.img rootfs.img -y
+                echo "Extracting kernel components from $iso_path (fallback)..."
+                if 7z x "$iso_path" -o"$extract_dir" boot/kernel boot/initrd.img ucode.img rootfs.img -y >/dev/null 2>&1 || \
+                   7z x "$iso_path" -o"$extract_dir" kernel initrd.img ucode.img rootfs.img -y >/dev/null 2>&1; then
+                    [ -f "$extract_dir/boot/kernel" ] && mv "$extract_dir/boot/kernel" "$extract_dir/kernel" || true
+                    [ -f "$extract_dir/boot/initrd.img" ] && mv "$extract_dir/boot/initrd.img" "$extract_dir/initrd.img" || true
+                    rmdir "$extract_dir/boot" 2>/dev/null || true
+                else
+                    echo "Warning: Unable to extract kernel assets from installer.iso"
+                fi
             else
                 echo "Warning: installer.iso not found for version ${version}. Cannot extract kernel assets."
             fi
@@ -613,6 +690,9 @@ fi
             echo "Version ${version} found in cache"
         fi
 
+        # Ensure required assets exist even for cached versions
+        ensure_version_assets "${version}"
+
         # Set up first version as default
         if [ -z "$DEFAULT_VERSION" ]; then
             DEFAULT_VERSION=$version
@@ -653,7 +733,15 @@ fi
             VERIFY_ERRORS=0
             
             # Check required files and permissions
-            for file in "EFI/BOOT/BOOTX64.EFI" "ipxe.efi.cfg" "ipxe.efi" "installer.iso"; do
+            for file in \
+                "EFI/BOOT/BOOTX64.EFI" \
+                "ipxe.efi.cfg" \
+                "ipxe.efi" \
+                "installer.iso" \
+                "kernel" \
+                "initrd.img" \
+                "ucode.img" \
+                "rootfs_installer.img"; do
                 if [ -f "/data/httpboot/latest/${file}" ]; then
                     echo "✓ ${file} is present"
                     if su -s /bin/sh www-data -c "test -r /data/httpboot/latest/${file}"; then
