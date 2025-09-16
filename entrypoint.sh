@@ -784,10 +784,14 @@ fi
 
         # Generate iPXE configuration from template
         echo "Configuring ipxe.efi.cfg for version ${version}..."
-        process_template \
-            "/config/ipxe.efi.cfg.template" \
-            "/data/httpboot/${version}/ipxe.efi.cfg" \
-            "SERVER_IP=${SERVER_IP}\nVERSION=${version}"
+        
+        # Use sed directly for reliable variable substitution
+        sed "s/{{SERVER_IP}}/${SERVER_IP}/g; s/{{VERSION}}/${version}/g" \
+            "/config/ipxe.efi.cfg.template" > "/data/httpboot/${version}/ipxe.efi.cfg"
+        
+        # Set permissions
+        chmod 644 "/data/httpboot/${version}/ipxe.efi.cfg"
+        chown www-data:www-data "/data/httpboot/${version}/ipxe.efi.cfg"
 
         # Verify template processing
         echo "Verifying URL injection..."
