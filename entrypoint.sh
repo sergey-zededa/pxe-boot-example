@@ -334,21 +334,26 @@ generate_dnsmasq_conf() {
         DEBUG=0
     fi
 
-    # Build mode-specific DHCP configuration block
-    DHCP_CONFIG=""
+    # Build mode-specific DHCP configuration block (with real newlines)
     if [ "$DHCP_MODE" = "standalone" ]; then
-        DHCP_CONFIG="# Standalone DHCP Configuration\n"
-        DHCP_CONFIG+="dhcp-range=${DHCP_RANGE_START},${DHCP_RANGE_END},${DHCP_SUBNET_MASK},12h\n"
-        DHCP_CONFIG+="dhcp-option=option:router,${DHCP_ROUTER}\n"
+        DHCP_CONFIG=$(printf '%s\n' \
+            "# Standalone DHCP Configuration" \
+            "dhcp-range=${DHCP_RANGE_START},${DHCP_RANGE_END},${DHCP_SUBNET_MASK},12h" \
+            "dhcp-option=option:router,${DHCP_ROUTER}")
     else
-        DHCP_CONFIG="# Proxy DHCP Configuration\n"
-        DHCP_CONFIG+="dhcp-range=${NETWORK_ADDRESS},proxy,${DHCP_SUBNET_MASK}\n"
         if [ -n "$PRIMARY_DHCP_IP" ]; then
-            DHCP_CONFIG+="dhcp-relay=${PRIMARY_DHCP_IP}\n"
+            DHCP_CONFIG=$(printf '%s\n' \
+                "# Proxy DHCP Configuration" \
+                "dhcp-range=${NETWORK_ADDRESS},proxy,${DHCP_SUBNET_MASK}" \
+                "dhcp-relay=${PRIMARY_DHCP_IP}")
+        else
+            DHCP_CONFIG=$(printf '%s\n' \
+                "# Proxy DHCP Configuration" \
+                "dhcp-range=${NETWORK_ADDRESS},proxy,${DHCP_SUBNET_MASK}")
         fi
     fi
 
-    # Optional blocks
+    # Optional blocks (single-line strings)
     DOMAIN_CONFIG=""
     [ -n "$DHCP_DOMAIN_NAME" ] && DOMAIN_CONFIG="domain=${DHCP_DOMAIN_NAME}"
 
@@ -356,24 +361,36 @@ generate_dnsmasq_conf() {
     [ -n "$DHCP_BROADCAST_ADDRESS" ] && BROADCAST_CONFIG="dhcp-option=28,${DHCP_BROADCAST_ADDRESS}"
 
     DEBUG_CONFIG=""
-    [ "$LOG_LEVEL" = "debug" ] && DEBUG_CONFIG=$'# Debug Logging\nlog-queries\nlog-dhcp'
+    if [ "$LOG_LEVEL" = "debug" ]; then
+        DEBUG_CONFIG=$(printf '%s\n' "# Debug Logging" "log-queries" "log-dhcp")
+    fi
 
-    # Generate configuration using template (POSIX-compatible)
+    # Generate configuration using template (substitute only simple variables first)
     echo "Processing dnsmasq configuration template..."
     TEMPLATE_VARS=$(printf '%s\n' \
         "LISTEN_INTERFACE=${LISTEN_INTERFACE}" \
         "SERVER_IP=${SERVER_IP}" \
         "DHCP_SUBNET_MASK=${DHCP_SUBNET_MASK}" \
-        "NETWORK_ADDRESS=${NETWORK_ADDRESS}" \
-        "DHCP_CONFIG=${DHCP_CONFIG}" \
-        "DOMAIN_CONFIG=${DOMAIN_CONFIG}" \
-        "BROADCAST_CONFIG=${BROADCAST_CONFIG}" \
-        "DEBUG_CONFIG=${DEBUG_CONFIG}")
+        "NETWORK_ADDRESS=${NETWORK_ADDRESS}")
 
     process_template \
         "/config/dnsmasq.conf.template" \
         "/etc/dnsmasq.conf" \
         "$TEMPLATE_VARS"
+
+    # Replace block placeholders with their multi-line content using awk
+    awk -v DHCP="$DHCP_CONFIG" \
+        -v DOMAIN="$DOMAIN_CONFIG" \
+        -v BC="$BROADCAST_CONFIG" \
+        -v DEBUGB="$DEBUG_CONFIG" '
+      {
+        if ($0 ~ /{{DHCP_CONFIG}}/) { if (DHCP != "") print DHCP; next }
+        if ($0 ~ /{{DOMAIN_CONFIG}}/) { if (DOMAIN != "") print DOMAIN; next }
+        if ($0 ~ /{{BROADCAST_CONFIG}}/) { if (BC != "") print BC; next }
+        if ($0 ~ /{{DEBUG_CONFIG}}/) { if (DEBUGB != "") print DEBUGB; next }
+        print
+      }
+    ' /etc/dnsmasq.conf > /etc/dnsmasq.conf.tmp && mv /etc/dnsmasq.conf.tmp /etc/dnsmasq.conf
 
     # Validate configuration
     echo "Validating dnsmasq configuration..."
