@@ -358,12 +358,22 @@ generate_dnsmasq_conf() {
     DEBUG_CONFIG=""
     [ "$LOG_LEVEL" = "debug" ] && DEBUG_CONFIG=$'# Debug Logging\nlog-queries\nlog-dhcp'
 
-    # Generate configuration using template
+    # Generate configuration using template (POSIX-compatible)
     echo "Processing dnsmasq configuration template..."
+    TEMPLATE_VARS=$(printf '%s\n' \
+        "LISTEN_INTERFACE=${LISTEN_INTERFACE}" \
+        "SERVER_IP=${SERVER_IP}" \
+        "DHCP_SUBNET_MASK=${DHCP_SUBNET_MASK}" \
+        "NETWORK_ADDRESS=${NETWORK_ADDRESS}" \
+        "DHCP_CONFIG=${DHCP_CONFIG}" \
+        "DOMAIN_CONFIG=${DOMAIN_CONFIG}" \
+        "BROADCAST_CONFIG=${BROADCAST_CONFIG}" \
+        "DEBUG_CONFIG=${DEBUG_CONFIG}")
+
     process_template \
         "/config/dnsmasq.conf.template" \
         "/etc/dnsmasq.conf" \
-        $'LISTEN_INTERFACE='"${LISTEN_INTERFACE}""\n"$'SERVER_IP='"${SERVER_IP}""\n"$'DHCP_SUBNET_MASK='"${DHCP_SUBNET_MASK}""\n"$'NETWORK_ADDRESS='"${NETWORK_ADDRESS}""\n"$'DHCP_CONFIG='"${DHCP_CONFIG}""\n"$'DOMAIN_CONFIG='"${DOMAIN_CONFIG}""\n"$'BROADCAST_CONFIG='"${BROADCAST_CONFIG}""\n"$'DEBUG_CONFIG='"${DEBUG_CONFIG}"' 
+        "$TEMPLATE_VARS"
 
     # Validate configuration
     echo "Validating dnsmasq configuration..."
