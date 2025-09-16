@@ -31,7 +31,7 @@ interface={{LISTEN_INTERFACE}}
 
 The DNSMASQ configuration is managed through `config/dnsmasq.conf.template`.
 
-#### Template Variables:
+#### Template Variables
 - `{{LISTEN_INTERFACE}}`: Network interface to listen on
 - `{{SERVER_IP}}`: Server IP address
 - `{{DHCP_SUBNET_MASK}}`: Subnet mask for DHCP
@@ -40,10 +40,11 @@ The DNSMASQ configuration is managed through `config/dnsmasq.conf.template`.
 - `{{DHCP_RANGE_START}}`: Start of DHCP range (standalone mode)
 - `{{DHCP_RANGE_END}}`: End of DHCP range (standalone mode)
 - `{{DHCP_ROUTER}}`: Gateway address (standalone mode)
-- `{{PRIMARY_DHCP_IP}}`: Primary DHCP server (proxy mode)
 - `{{DHCP_DOMAIN_NAME}}`: Optional domain name
 - `{{DHCP_BROADCAST_ADDRESS}}`: Optional broadcast address
 - `{{DEBUG}}`: Debug mode flag (1 or 0)
+
+Note: In proxy mode, dnsmasq uses `dhcp-range=<network>,proxy,<mask>` and must not include `dhcp-relay`. The `PRIMARY_DHCP_IP` environment variable is used only by the startup script to validate connectivity to the primary DHCP server and is not injected into `dnsmasq.conf`.
 
 #### Validation
 Configuration is validated in two steps:

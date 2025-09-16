@@ -341,16 +341,11 @@ generate_dnsmasq_conf() {
             "dhcp-range=${DHCP_RANGE_START},${DHCP_RANGE_END},${DHCP_SUBNET_MASK},12h" \
             "dhcp-option=option:router,${DHCP_ROUTER}")
     else
-        if [ -n "$PRIMARY_DHCP_IP" ]; then
-            DHCP_CONFIG=$(printf '%s\n' \
-                "# Proxy DHCP Configuration" \
-                "dhcp-range=${NETWORK_ADDRESS},proxy,${DHCP_SUBNET_MASK}" \
-                "dhcp-relay=${PRIMARY_DHCP_IP}")
-        else
-            DHCP_CONFIG=$(printf '%s\n' \
-                "# Proxy DHCP Configuration" \
-                "dhcp-range=${NETWORK_ADDRESS},proxy,${DHCP_SUBNET_MASK}")
-        fi
+        DHCP_CONFIG=$(printf '%s\n' \
+            "# Proxy DHCP Configuration" \
+            "dhcp-range=${NETWORK_ADDRESS},proxy,${DHCP_SUBNET_MASK}")
+        # Note: In proxy mode, do NOT use dhcp-relay. Combining dhcp-relay with any dhcp-range is invalid in dnsmasq.
+        # PRIMARY_DHCP_IP is retained for connectivity validation only.
     fi
 
     # Optional blocks (single-line strings)
@@ -526,7 +521,7 @@ VERSION=${version}"
             rm "/data/downloads/netboot-${version}.tar"
             
             # Debug - show what files we have before rename
-            echo "\nInitial files for version ${version}:"
+            echo "Initial files for version ${version}:"
             ls -laR "/data/httpboot/${version}/" || echo "Failed to list directory"
 
             # Rename rootfs.img if it exists
@@ -537,13 +532,13 @@ VERSION=${version}"
             find "/data/httpboot/${version}" -type f -exec chmod 644 {} \;
             find "/data/httpboot/${version}" -type d -exec chmod 755 {} \;
 
-            echo "\nVerifying file structure after permission updates:"
+            echo "Verifying file structure after permission updates:"
             echo "Files for version ${version}:"
             ls -laR "/data/httpboot/${version}/" || echo "Failed to list directory"
 
             # Check for BOOTX64.EFI and handle ISO if needed
             if [ ! -f "/data/httpboot/${version}/EFI/BOOT/BOOTX64.EFI" ] && [ -f "/data/httpboot/${version}/installer.iso" ]; then
-                echo "\nBOOTX64.EFI not found but installer.iso exists. Attempting extraction..."
+                echo "BOOTX64.EFI not found but installer.iso exists. Attempting extraction..."
                 ISO_EXTRACT_DIR="/tmp/iso-${version}"
                 mkdir -p "${ISO_EXTRACT_DIR}"
                 if 7z x "/data/httpboot/${version}/installer.iso" -o"${ISO_EXTRACT_DIR}" EFI/BOOT/BOOTX64.EFI; then
@@ -563,7 +558,7 @@ VERSION=${version}"
             fi
 
 # Final verification
-echo "\nFinal file structure verification for ${version}:"
+echo "Final file structure verification for ${version}:"
 if [ -f "/data/httpboot/${version}/EFI/BOOT/BOOTX64.EFI" ]; then
     echo "✓ BOOTX64.EFI is present and accessible"
     ls -l "/data/httpboot/${version}/EFI/BOOT/BOOTX64.EFI"
@@ -572,7 +567,7 @@ if [ -f "/data/httpboot/${version}/EFI/BOOT/BOOTX64.EFI" ]; then
     find "/data/httpboot/${version}" -type f -exec sh -c 'if ! su -s /bin/sh www-data -c "test -r {}" ; then echo "Warning: {} not readable by www-data"; fi' \;
     
     # Test nginx config
-    echo "\nTesting nginx configuration..."
+    echo "Testing nginx configuration..."
     nginx -t
     
     # Verify that nginx can access files
@@ -627,7 +622,7 @@ fi
             set_file_permissions
             
             # Verify latest directory structure
-            echo "\nVerifying latest directory structure:"
+            echo "Verifying latest directory structure:"
             VERIFY_ERRORS=0
             
             # Check required files and permissions
@@ -1142,7 +1137,8 @@ if ! grep -q "chain --replace --autofree" /data/httpboot/boot.ipxe || \
     echo "  - #!ipxe header"
     echo "  - menu EVE-OS Boot Menu"
     echo "  - chain --replace --autofree command"
-    echo "\nCurrent content:"
+    echo ""
+    echo "Current content:"
     cat /data/httpboot/boot.ipxe
     exit 1
 fi
