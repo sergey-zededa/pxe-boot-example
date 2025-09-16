@@ -13,11 +13,11 @@ echo "Downloading installer. This may take some time. Please wait patiently."
 set isnetboot=true
 export isnetboot
 
-# The BOOTX64.EFI is in .../<version>/EFI/BOOT, while installer.iso is at .../<version>/installer.iso
-# cmdpath points to the directory containing this file (EFI/BOOT). Go up two levels.
-set iso_path=($cmdpath)/../../installer.iso
+# Use absolute HTTP URL for installer.iso since $cmdpath is unreliable in network boot
+# {{SERVER_IP}} and {{VERSION}} are substituted by the entrypoint script
+set iso_url=http://{{SERVER_IP}}/{{VERSION}}/installer.iso
 
 # Mount the installer ISO and chain to its GRUB config
-loopback loop0 $iso_path
+loopback loop0 $iso_url
 set root=loop0
 configfile ($root)/EFI/BOOT/grub.cfg
