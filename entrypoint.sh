@@ -384,10 +384,10 @@ generate_dnsmasq_conf() {
         -v BC="$BROADCAST_CONFIG" \
         -v DEBUGB="$DEBUG_CONFIG" '
       {
-        if ($0 ~ /{{DHCP_CONFIG}}/) { if (DHCP != "") print DHCP; next }
-        if ($0 ~ /{{DOMAIN_CONFIG}}/) { if (DOMAIN != "") print DOMAIN; next }
-        if ($0 ~ /{{BROADCAST_CONFIG}}/) { if (BC != "") print BC; next }
-        if ($0 ~ /{{DEBUG_CONFIG}}/) { if (DEBUGB != "") print DEBUGB; next }
+        if (index($0, "{{DHCP_CONFIG}}")) { if (DHCP != "") print DHCP; next }
+        if (index($0, "{{DOMAIN_CONFIG}}")) { if (DOMAIN != "") print DOMAIN; next }
+        if (index($0, "{{BROADCAST_CONFIG}}")) { if (BC != "") print BC; next }
+        if (index($0, "{{DEBUG_CONFIG}}")) { if (DEBUGB != "") print DEBUGB; next }
         print
       }
     ' /etc/dnsmasq.conf > /etc/dnsmasq.conf.tmp && mv /etc/dnsmasq.conf.tmp /etc/dnsmasq.conf
@@ -654,9 +654,9 @@ fi
             
             # Report verification results
             if [ "$VERIFY_ERRORS" -eq 0 ]; then
-                echo "\n✓ Latest directory verification completed successfully"
+                echo "✓ Latest directory verification completed successfully"
             else
-                echo "\n✗ Latest directory verification completed with ${VERIFY_ERRORS} errors"
+                echo "✗ Latest directory verification completed with ${VERIFY_ERRORS} errors"
             fi
         fi
 

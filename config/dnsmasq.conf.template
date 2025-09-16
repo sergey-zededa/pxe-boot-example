@@ -8,11 +8,6 @@ log-dhcp
 enable-tftp
 tftp-root=/tftpboot
 
-# TFTP optimizations for large files
-tftp-block-size=8192
-tftp-max-failures=100
-tftp-mtu=1500
-
 # Client detection
 dhcp-match=set:ipxe,175                   # iPXE ROM
 dhcp-match=set:efi64,option:client-arch,7  # EFI x64
