@@ -12,7 +12,10 @@ echo Initializing network stack...
 dhcp || goto retry_net_error
 
 # Verify network configuration
-console --picture off
+# Note: Some builds do not include the 'console' command; avoid using it to prevent script errors
+# console --picture off
+set debug net,http,script,img
+
 echo iPXE boot starting...
 echo Network Status:
 echo IP: ${net0/ip}
@@ -46,13 +49,21 @@ iseq ${buildarch} x86_64 || goto arch_error
 # Load kernel and initrd images directly from HTTP
 # Matches the working configuration (no GRUB)
 echo Booting x86_64 EVE-OS installer directly...
+# Fetch and load images explicitly to get detailed error messages
 kernel ${url}kernel ${console} ${eve_args} ${installer_args} ${platform_tweaks} || goto load_error
+imgstat
+
 echo Loading microcode...
 initrd ${url}ucode.img || goto load_error
+imgstat
+
 echo Loading initrd...
 initrd ${url}initrd.img || goto load_error
+imgstat
+
 echo Loading EVE-OS installer image...
 initrd ${url}rootfs_installer.img || goto load_error
+imgstat
 
 # Boot the loaded kernel
 boot || goto load_error
