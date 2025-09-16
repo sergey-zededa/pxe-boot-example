@@ -1,6 +1,7 @@
 worker_processes 1;
 
-error_log /dev/stdout debug;
+# Production logging level
+error_log /dev/stdout warn;
 
 events {
     worker_connections 1024;
@@ -17,24 +18,11 @@ http {
     sendfile      on;
     keepalive_timeout 65;
     
-    # Enhanced logging format
-    log_format  debug_fmt  '$remote_addr - $remote_user [$time_local] "$request" '
+    # Concise access log
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
                       '$status $body_bytes_sent "$http_referer" '
-                      '"$http_user_agent" "$http_x_forwarded_for" '
-                      'fs_path="$request_filename" '
-                      'conn="$connection" '
-                      'host="$host" '
-                      'scheme="$scheme" '
-                      'req_length="$request_length" '
-                      'resp_time="$request_time" '
-                      'bytes_sent="$bytes_sent" '
-                      'req_body="$request_body" '
-                      'http_accept="$http_accept"';
-    
-    access_log /dev/stdout debug_fmt;
-    
-    # Debug settings
-    error_log /dev/stdout debug;
+                      '"$http_user_agent"';
+    access_log /dev/stdout main;
 
     server {
         listen 80 default_server;
@@ -47,8 +35,7 @@ http {
         # Basic configuration
         autoindex on;
         autoindex_exact_size off;
-        access_log /dev/stdout debug_fmt;
-        error_log /dev/stdout debug;
+        # Use top-level error_log; no duplication here.
 
         # Disable caching globally
         add_header Cache-Control "no-cache, no-store, must-revalidate" always;

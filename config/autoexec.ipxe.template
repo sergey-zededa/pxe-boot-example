@@ -1,7 +1,6 @@
 #!ipxe
 
-# Enable debugging
-set debug all
+# Debugging disabled by default (enable manually if needed)
 
 # Network configuration
 :start

@@ -1,4 +1,6 @@
 #!/bin/bash
+# Deprecated helper kept for reference; not used in production entrypoint.
+# This script is superseded by entrypoint.sh template processing.
 
 # Function to generate version-specific configuration
 generate_version_config() {
@@ -8,9 +10,7 @@ generate_version_config() {
     cat > "/data/httpboot/${version}/ipxe.efi.cfg" <<EOF
 #!ipxe
 
-# Enable debugging
-set debug all
-set debug dhcp,net
+# Debugging disabled by default
 
 # Force our server address
 set next-server ${SERVER_IP}

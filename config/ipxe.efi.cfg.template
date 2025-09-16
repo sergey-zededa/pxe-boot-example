@@ -1,8 +1,6 @@
 #!ipxe
 
-# Enable debugging for network and DHCP
-set debug all
-set debug dhcp,net
+# Debugging disabled by default (enable manually if needed)
 
 # Force our server address (ignore DHCP next-server)
 set next-server {{SERVER_IP}}

@@ -134,6 +134,7 @@ docker exec ipxe-server cat /etc/dnsmasq.conf
 1. **DHCP Conflicts**
    - In standalone mode, ensure no other DHCP servers are active on the network
    - In proxy mode, verify PRIMARY_DHCP_IP is correct
+   - If the client chains to the wrong host, force SERVER_IP in iPXE scripts (already the default)
 
 2. **Network Access**
    - Container needs --net=host and --privileged for network access

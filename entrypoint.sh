@@ -286,7 +286,11 @@ generate_autoexec() {
     chown dnsmasq:dnsmasq /tftpboot/autoexec.ipxe
 }
 
-# Function to generate nginx configuration
+# Function to generate nginx configuration (production defaults)
+# - concise logging
+# - single error_log declaration
+# - strict file serving from /data/httpboot
+# The template contains no DEBUG-only branches to avoid drift between modes.
 generate_nginx_conf() {
     printf "Generating nginx configuration...\n"
 
@@ -760,154 +764,7 @@ set_file_permissions() {
     echo "File permissions updated successfully"
 }
 
-# Function to generate version-specific iPXE config
-generate_version_config() {
-    local version=$1
-    echo "Generating iPXE config for version ${version}..."
-
-    # Create version directory if it doesn't exist
-    mkdir -p "/data/httpboot/${version}"
-
-# Generate version-specific ipxe.efi.cfg from template
-    process_template \
-        "/config/ipxe.efi.cfg.template" \
-        "/data/httpboot/${version}/ipxe.efi.cfg" \
-        "SERVER_IP=${SERVER_IP}
-VERSION=${version}"
-
-    echo "Generated iPXE config for version ${version}"
-}
-
-# Function to generate boot menu
-generate_boot_menu() {
-    echo "Generating iPXE boot menu..."
-    
-    # Create initial menu file
-    cat > /data/httpboot/boot.ipxe <<'EOF'
-#!ipxe
-
-# Enable debugging and wait for network
-set debug all
-set debug dhcp,net
-
-:retry_dhcp
-echo Configuring network...
-dhcp || goto retry_dhcp_fail
-
-echo Network configured successfully:
-echo IP: ${net0/ip}
-echo Netmask: ${net0/netmask}
-echo Gateway: ${net0/gateway}
-echo DNS: ${net0/dns}
-
-# Main menu
-:start
-menu EVE-OS Boot Menu
-item --gap -- System Information:
-item --gap -- Client IP: ${net0/ip}
-item --gap -- Architecture: ${buildarch}
-item --gap -- Manufacturer: ${smbios/manufacturer}
-item --gap --
-item --gap -- Available versions:
-EOF
-    
-    # Add menu items
-    item_num=1
-    OLD_IFS=$IFS
-    IFS=','
-    for version in $EVE_VERSIONS; do
-        echo "item eve_${item_num} EVE-OS ${version}" >> /data/httpboot/boot.ipxe
-        generate_version_config "${version}"
-        item_num=$((item_num+1))
-    done
-    IFS=$OLD_IFS
-    
-    # Add menu footer
-    cat >> /data/httpboot/boot.ipxe <<'EOF'
-
-item
-item --gap -- Tools:
-item shell Drop to iPXE shell
-item reboot Reboot system
-item retry Retry network configuration
-item
-item --gap -- --------------------------------------------
-item --gap Version information:
-item --gap Selected version will boot in ${BOOT_MENU_TIMEOUT} seconds
-item --gap Server IP: ${SERVER_IP}
-
-choose --timeout ${BOOT_MENU_TIMEOUT}000 --default eve_1 selected || goto menu_error
-goto ${selected}
-
-:retry_dhcp_fail
-echo DHCP configuration failed. Retrying in 3 seconds...
-sleep 3
-goto retry_dhcp
-
-:menu_error
-echo Menu selection failed
-echo Error: ${errno}
-echo Error message: ${errstr}
-prompt --timeout 5000 Press any key to retry or wait 5 seconds...
-goto start
-EOF
-
-    # Add menu handlers
-    item_num=1
-    OLD_IFS=$IFS
-    IFS=','
-    for version in $EVE_VERSIONS; do
-        cat >> /data/httpboot/boot.ipxe <<EOF
-
-:eve_${item_num}
-echo Loading EVE-OS ${version}...
-chain --replace --autofree http://${SERVER_IP}/${version}/ipxe.efi.cfg || goto chain_error
-
-:chain_error
-echo Chain load failed for EVE-OS ${version}
-echo Error: \${errno}
-echo Common error codes:
-echo 1 - File not found
-echo 2 - Access denied
-echo 3 - Disk error
-echo 4 - Network error
-prompt --timeout 5000 Press any key to return to menu or wait 5 seconds...
-goto start
-EOF
-        item_num=$((item_num+1))
-    done
-    IFS=$OLD_IFS
-
-    # Add utility handlers
-    cat >> /data/httpboot/boot.ipxe <<EOF
-
-:shell
-echo Dropping to iPXE shell...
-shell
-goto start
-
-:reboot
-echo Rebooting system...
-reboot
-
-:retry
-echo Retrying network configuration...
-dhcp || goto retry_error
-goto start
-
-:retry_error
-echo DHCP configuration failed
-echo Error: \${errno}
-prompt --timeout 5000 Press any key to return to menu or wait 5 seconds...
-goto start
-EOF
-
-    # Set permissions
-    chmod 644 /data/httpboot/boot.ipxe
-    chown www-data:www-data /data/httpboot/boot.ipxe
-    
-    echo "Boot menu generated successfully"
-}
+# (removed duplicate definitions of generate_version_config and generate_boot_menu)
 
 # === Main Script ===
 echo "Starting EVE-OS iPXE Server..."
