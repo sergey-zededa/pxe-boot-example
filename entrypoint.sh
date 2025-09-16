@@ -682,7 +682,6 @@ fi
             fi
         fi
 
-        fi
 
         # Update ipxe.efi.cfg with correct URL
         echo "Configuring ipxe.efi.cfg for version ${version}..."
