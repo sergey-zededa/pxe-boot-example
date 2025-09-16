@@ -15,25 +15,31 @@ dhcp-match=set:efi64,option:client-arch,9  # EFI x64
 dhcp-match=set:ipxe-ok,option:user-class,iPXE
 
 # Server options
+# Explicit next-server (option 66) for clients which use it
+# (some PXE ROMs instead rely on the siaddr field from dhcp-boot below)
 dhcp-option=66,{{SERVER_IP}}              # TFTP server
+# Avoid packing boot filename into vendor options (helps finicky PXE ROMs)
+dhcp-no-override
 
 # DHCP Configuration (mode-specific)
 {{DHCP_CONFIG}}
 
 # Boot configuration for BIOS clients
-dhcp-boot=tag:!ipxe,tag:!efi64,undionly.kpxe
+# Provide filename and set siaddr (server IP) explicitly
+# Some PXE stacks ignore option 66 and only look at siaddr
+# Syntax: dhcp-boot=<filename>,<servername>,<server-ip>
+dhcp-boot=tag:!ipxe,tag:!efi64,undionly.kpxe,,{{SERVER_IP}}
 
-# Boot configuration for UEFI clients
-# Use snponly.efi to minimize NBP size and avoid PXE-E05 issues on some firmware
-# See: clients with limited NBP buffer may fail to load large ipxe.efi
-# This binary relies on the firmware SNP driver and is significantly smaller
-# than a full-driver ipxe.efi
-# File is downloaded at container start into /tftpboot/snponly.efi
-# Fallback to ipxe.efi if you need built-in drivers.
-dhcp-boot=tag:!ipxe,tag:efi64,snponly.efi
+# Boot configuration for UEFI clients (smaller NBP to avoid PXE-E05)
+# Provide filename and siaddr explicitly
+dhcp-boot=tag:!ipxe,tag:efi64,snponly.efi,,{{SERVER_IP}}
 
-# Boot configuration for iPXE clients
+# Boot configuration for iPXE clients (HTTP chain)
 dhcp-boot=tag:ipxe,http://{{SERVER_IP}}/boot.ipxe
+
+# Advertise PXE service menu entries (optional but improves compatibility)
+pxe-service=tag:efi64,"PXE UEFI x64 (iPXE)",snponly.efi
+pxe-service=tag:!efi64,"PXE BIOS (iPXE)",undionly.kpxe
 
 # Optional domain name configuration
 {{DOMAIN_CONFIG}}
