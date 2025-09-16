@@ -53,16 +53,18 @@ echo Booting x86_64 EVE-OS installer directly...
 kernel ${url}kernel ${console} ${eve_args} ${installer_args} ${platform_tweaks} || goto load_error
 imgstat
 
+# Load microcode (optional - continue if missing)
 echo Loading microcode...
-initrd ${url}ucode.img || goto load_error
+initrd ${url}ucode.img || echo Microcode not available, continuing...
 imgstat
 
 echo Loading initrd...
 initrd ${url}initrd.img || goto load_error
 imgstat
 
+# Load EVE-OS installer image (optional - many EVE distributions work without it)
 echo Loading EVE-OS installer image...
-initrd ${url}rootfs_installer.img || goto load_error
+initrd ${url}rootfs_installer.img || echo EVE-OS installer image not available, continuing...
 imgstat
 
 # Boot the loaded kernel
@@ -86,13 +88,12 @@ goto retry_net
 echo Boot failed while loading components!
 echo Error: ${errno}
 echo Message: ${errstr}
-echo Expected URLs:
+echo Required URLs:
 echo   ${url}kernel
-===
-echo   ${url}ucode.img
-===
 echo   ${url}initrd.img
-===
+echo
+echo Optional URLs (loaded if available):
+echo   ${url}ucode.img
 echo   ${url}rootfs_installer.img
 prompt Press any key to retry...
 goto retry_net

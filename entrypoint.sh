@@ -739,9 +739,7 @@ fi
                 "ipxe.efi" \
                 "installer.iso" \
                 "kernel" \
-                "initrd.img" \
-                "ucode.img" \
-                "rootfs_installer.img"; do
+                "initrd.img"; do
                 if [ -f "/data/httpboot/latest/${file}" ]; then
                     echo "✓ ${file} is present"
                     if su -s /bin/sh www-data -c "test -r /data/httpboot/latest/${file}"; then
@@ -753,6 +751,20 @@ fi
                 else
                     echo "✗ WARNING: ${file} is missing"
                     VERIFY_ERRORS=$((VERIFY_ERRORS + 1))
+                fi
+            done
+            
+            # Check optional files (no errors counted)
+            for file in "ucode.img" "rootfs_installer.img"; do
+                if [ -f "/data/httpboot/latest/${file}" ]; then
+                    echo "✓ ${file} is present"
+                    if su -s /bin/sh www-data -c "test -r /data/httpboot/latest/${file}"; then
+                        echo "✓ ${file} is readable by www-data"
+                    else
+                        echo "✗ WARNING: ${file} is not readable by www-data"
+                    fi
+                else
+                    echo "✗ WARNING: ${file} is missing"
                 fi
             done
             
@@ -770,46 +782,21 @@ fi
             fi
 
 
-        # Update ipxe.efi.cfg with correct URL
+        # Generate iPXE configuration from template
         echo "Configuring ipxe.efi.cfg for version ${version}..."
-        sed -i "s|^#\?set url.*|set url http://${SERVER_IP}/${version}/|" "/data/httpboot/${version}/ipxe.efi.cfg"
-    # Use sed to handle both commented and uncommented versions with proper spacing
-    # Create iPXE configuration file
-cat > "/data/httpboot/${version}/ipxe.efi.cfg" <<- EOF
-#!ipxe
+        process_template \
+            "/config/ipxe.efi.cfg.template" \
+            "/data/httpboot/${version}/ipxe.efi.cfg" \
+            "SERVER_IP=${SERVER_IP}\nVERSION=${version}"
 
-# Set boot parameters
-set url http://${SERVER_IP}/${version}/
-set next-server ${SERVER_IP}
-
-# Define kernel arguments
-set console console=ttyS0 console=tty0
-set eve_args eve_soft_serial=\${mac:hexhyp} eve_reboot_after_install getty
-set installer_args root=/initrd.image find_boot=netboot overlaytmpfs fastboot
-
-# Hardware-specific console settings
-iseq \${smbios/manufacturer} QEMU && set console console=hvc0 console=ttyS0 ||
-
-# Load kernel and initrd images directly
-kernel \${url}kernel \${console} \${eve_args} \${installer_args}
-initrd \${url}ucode.img
-initrd \${url}initrd.img
-initrd \${url}rootfs_installer.img
-
-# Boot the loaded kernel
-boot || goto chain_error
-EOF
-    sed -i "s|^#\s*set url.*|set url http://${SERVER_IP}/${version}/|; s|^\s*set url.*|set url http://${SERVER_IP}/${version}/|" "/data/httpboot/${version}/ipxe.efi.cfg"
-
-    # Verify URL injection
-    echo "Verifying URL injection..."
-    if ! grep -q "^set url http://${SERVER_IP}/${version}/" "/data/httpboot/${version}/ipxe.efi.cfg"; then
-        echo "Warning: URL injection may have failed for version ${version}. Please verify the configuration."
-        echo "Current 'set url' line in ipxe.efi.cfg:"
-        grep "set url" "/data/httpboot/${version}/ipxe.efi.cfg" || echo "No 'set url' line found!"
-    else
-        echo "URL successfully injected for version ${version}"
-    fi
+        # Verify template processing
+        echo "Verifying URL injection..."
+        if grep -q "set url http://${SERVER_IP}/${version}/" "/data/httpboot/${version}/ipxe.efi.cfg"; then
+            echo "URL successfully injected for version ${version}"
+        else
+            echo "WARNING: Boot URL variable injection may have failed"
+            echo "Expected one of: 'set url http://${SERVER_IP}/${version}/' or 'set url http://\${next-server}/${version}/'"
+        fi
 
 done
     IFS=$OLD_IFS
@@ -874,8 +861,6 @@ set_file_permissions() {
     echo "File permissions updated successfully"
 }
 
-# (removed duplicate definitions of generate_version_config and generate_boot_menu)
-
 # === Main Script ===
 echo "Starting EVE-OS iPXE Server..."
 
@@ -884,54 +869,6 @@ validate_environment
 
 # 2. Set up EVE-OS versions and assets
 setup_eve_versions
-
-# Source iPXE configuration functions
-# Function to generate version-specific iPXE config
-generate_version_config() {
-    local version=$1
-    echo "Generating iPXE config for version ${version}..."
-
-    # Create version directory if it doesn't exist
-    mkdir -p "/data/httpboot/${version}"
-
-    # Generate config from template
-    echo "Using template from /config/ipxe.efi.cfg.template"
-    if [ ! -f "/config/ipxe.efi.cfg.template" ]; then
-        echo "ERROR: Template file /config/ipxe.efi.cfg.template not found!"
-        exit 1
-    fi
-
-    # Replace variables in template
-    echo "Injecting variables: SERVER_IP=${SERVER_IP}, VERSION=${version}"
-    sed "s/{{SERVER_IP}}/${SERVER_IP}/g; s/{{VERSION}}/${version}/g" \
-        /config/ipxe.efi.cfg.template > "/data/httpboot/${version}/ipxe.efi.cfg"
-
-    # Set permissions
-    chmod 644 "/data/httpboot/${version}/ipxe.efi.cfg"
-    chown www-data:www-data "/data/httpboot/${version}/ipxe.efi.cfg"
-
-    # Verify the generated config
-    echo "Verifying generated config..."
-    if ! grep -q "^#!ipxe" "/data/httpboot/${version}/ipxe.efi.cfg"; then
-        echo "ERROR: Generated config missing required iPXE header!"
-        exit 1
-    fi
-    # Check for next-server setting using two simple patterns to avoid fragile regex
-    if ! grep -q "set next-server ${SERVER_IP}" "/data/httpboot/${version}/ipxe.efi.cfg" \
-       && ! grep -q 'set next-server ${next-server}' "/data/httpboot/${version}/ipxe.efi.cfg"; then
-        echo "WARNING: next-server not set in generated config"
-        echo "Expected one of: 'set next-server ${SERVER_IP}' or 'set next-server ${next-server}'"
-    fi
-
-    # Check for boot-url setting using two simple patterns to avoid fragile regex
-    if ! grep -q "set boot-url http://${SERVER_IP}/${version}" "/data/httpboot/${version}/ipxe.efi.cfg" \
-       && ! grep -q "set boot-url http://\${next-server}/${version}" "/data/httpboot/${version}/ipxe.efi.cfg"; then
-        echo "WARNING: Boot URL variable injection may have failed"
-        echo "Expected one of: 'set boot-url http://${SERVER_IP}/${version}' or 'set boot-url http://\${next-server}/${version}'"
-    fi
-
-    echo "Successfully generated iPXE config for version ${version}"
-}
 
 # Function to generate boot menu
 generate_boot_menu() {
@@ -968,7 +905,6 @@ EOF
     IFS=','
     for version in $EVE_VERSIONS; do
         echo "item eve_${item_num} EVE-OS ${version}" >> /data/httpboot/boot.ipxe
-        generate_version_config "${version}"
         item_num=$((item_num+1))
     done
     IFS=$OLD_IFS
