@@ -1,21 +1,20 @@
-# GRUB configuration for direct kernel loading via HTTP
+# GRUB Diagnostic Script
 
-# Set the base URL using template variables provided by the entrypoint script
-set root_url=http://{{SERVER_IP}}/{{VERSION}}
+echo "Starting GRUB diagnostics..."
 
-# Define kernel arguments (copied from the original ipxe.efi.cfg)
-set console_args="console=ttyS0 console=tty0"
-set installer_args="root=/initrd.image find_boot=netboot overlaytmpfs fastboot"
+echo "Attempting to load standard modules..."
+insmod http
+insmod linux
+insmod initrd
+insmod normal
 
-echo "Loading EVE-OS kernel and initramfs via HTTP..."
+echo "Listing available commands:"
+lscommands
 
-# Load the kernel directly via HTTP. GRUB's http module uses the (http,SERVER)/PATH syntax.
-linux (http,{{SERVER_IP}})/{{VERSION}}/kernel ${console_args} ${installer_args}
+echo ""
+echo "Listing loaded modules:"
+lsmod
 
-# Load all required initrd images. They are loaded into memory sequentially.
-initrd (http,{{SERVER_IP}})/{{VERSION}}/ucode.img
-initrd (http,{{SERVER_IP}})/{{VERSION}}/initrd.img
-initrd (http,{{SERVER_IP}})/{{VERSION}}/rootfs_installer.img
-
-echo "Starting EVE-OS installer..."
-boot
+echo ""
+echo "Diagnostics complete. The system will pause for 30 seconds."
+sleep 30
