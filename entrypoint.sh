@@ -914,7 +914,6 @@ EOF
     IFS=','
     for version in $EVE_VERSIONS; do
         echo "item eve_${item_num} EVE-OS ${version}" >> /data/httpboot/boot.ipxe
-        generate_version_config "${version}"
         item_num=$((item_num+1))
     done
     IFS=$OLD_IFS
