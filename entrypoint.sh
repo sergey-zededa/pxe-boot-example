@@ -493,6 +493,14 @@ VERSION=${version}"
             if [ -f "${TEMP_DIR}/EFI/BOOT/BOOTX64.EFI" ]; then
                 echo "Copying EFI boot files..."
                 cp -r "${TEMP_DIR}/EFI" "/data/httpboot/${version}/"
+                # Overwrite upstream grub.cfg with our controlled template to avoid drift
+                process_template \
+                    "/config/grub.cfg.template" \
+                    "/data/httpboot/${version}/EFI/BOOT/grub.cfg" \
+                    "SERVER_IP=${SERVER_IP}
+VERSION=${version}"
+                chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
+                chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
             elif [ -f "${TEMP_DIR}/installer.iso" ]; then
                 echo "Found installer.iso, extracting EFI files..."
                 ISO_EXTRACT_DIR="${TEMP_DIR}/iso"
@@ -501,6 +509,14 @@ VERSION=${version}"
                     if [ -f "${ISO_EXTRACT_DIR}/EFI/BOOT/BOOTX64.EFI" ]; then
                         echo "Copying EFI files from ISO..."
                         cp -r "${ISO_EXTRACT_DIR}/EFI" "/data/httpboot/${version}/"
+                        # Overwrite upstream grub.cfg with our controlled template
+                        process_template \
+                            "/config/grub.cfg.template" \
+                            "/data/httpboot/${version}/EFI/BOOT/grub.cfg" \
+                            "SERVER_IP=${SERVER_IP}
+VERSION=${version}"
+                        chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
+                        chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
                     else
                         echo "Warning: No EFI/BOOT/BOOTX64.EFI found in ISO"
                     fi
@@ -519,6 +535,16 @@ VERSION=${version}"
                     cp "${TEMP_DIR}/${file}" "/data/httpboot/${version}/"
                 fi
             done
+
+            # Ensure installer.iso is present for GRUB loopback
+            if [ -f "${TEMP_DIR}/installer.iso" ]; then
+                echo "Copying installer.iso..."
+                cp "${TEMP_DIR}/installer.iso" "/data/httpboot/${version}/installer.iso"
+                chown www-data:www-data "/data/httpboot/${version}/installer.iso"
+                chmod 644 "/data/httpboot/${version}/installer.iso"
+            else
+                echo "Warning: installer.iso not found in extracted archive for ${version}"
+            fi
 
             # Clean up
             rm -rf "${TEMP_DIR}"
@@ -566,22 +592,30 @@ echo "Final file structure verification for ${version}:"
 if [ -f "/data/httpboot/${version}/EFI/BOOT/BOOTX64.EFI" ]; then
     echo "✓ BOOTX64.EFI is present and accessible"
     ls -l "/data/httpboot/${version}/EFI/BOOT/BOOTX64.EFI"
-    
-    # Ensure all files are readable
-    find "/data/httpboot/${version}" -type f -exec sh -c 'if ! su -s /bin/sh www-data -c "test -r {}" ; then echo "Warning: {} not readable by www-data"; fi' \;
-    
-    # Test nginx config
-    echo "Testing nginx configuration..."
-    nginx -t
-    
-    # Verify that nginx can access files
-    if ! su -s /bin/sh www-data -c "cat /data/httpboot/${version}/ipxe.efi.cfg" > /dev/null 2>&1; then
-        echo "Warning: www-data cannot read ipxe.efi.cfg"
-    else
-        echo "✓ www-data can read ipxe.efi.cfg"
-    fi
 else
     echo "✗ WARNING: BOOTX64.EFI is missing!"
+fi
+
+# Verify installer.iso presence
+if [ -f "/data/httpboot/${version}/installer.iso" ]; then
+    echo "✓ installer.iso is present"
+    ls -l "/data/httpboot/${version}/installer.iso"
+else
+    echo "✗ WARNING: installer.iso is missing — GRUB will drop to CLI"
+fi
+    
+# Ensure all files are readable
+find "/data/httpboot/${version}" -type f -exec sh -c 'if ! su -s /bin/sh www-data -c "test -r {}" ; then echo "Warning: {} not readable by www-data"; fi' \;
+    
+# Test nginx config
+echo "Testing nginx configuration..."
+nginx -t
+    
+# Verify that nginx can access files
+if ! su -s /bin/sh www-data -c "cat /data/httpboot/${version}/ipxe.efi.cfg" > /dev/null 2>&1; then
+    echo "Warning: www-data cannot read ipxe.efi.cfg"
+else
+    echo "✓ www-data can read ipxe.efi.cfg"
 fi
             
             # Set proper permissions for extracted files
@@ -630,7 +664,7 @@ fi
             VERIFY_ERRORS=0
             
             # Check required files and permissions
-            for file in "EFI/BOOT/BOOTX64.EFI" "ipxe.efi.cfg" "ipxe.efi"; do
+            for file in "EFI/BOOT/BOOTX64.EFI" "ipxe.efi.cfg" "ipxe.efi" "installer.iso"; do
                 if [ -f "/data/httpboot/latest/${file}" ]; then
                     echo "✓ ${file} is present"
                     if su -s /bin/sh www-data -c "test -r /data/httpboot/latest/${file}"; then

@@ -1,25 +1,17 @@
-# Load required modules
-insmod all_video
-insmod efi_gop
-insmod efi_uga
-insmod font
-insmod gfxterm
+# EVE-OS netboot: bootstrap GRUB from installer ISO located next to this file
+# This stub is loaded via HTTP by iPXE and must then fetch the real GRUB config
+# from within the installer ISO. Keeping this minimal avoids module/version drift.
 
-# Initialize network
-insmod net
-insmod efinet
-insmod http
+echo "Downloading installer. This may take some time. Please wait patiently."
 
-# Set net device and server
-net_default_server="{{SERVER_IP}}"
-net_default_interface="0"
+# Mark this as a netboot so downstream GRUB config can adapt
+set isnetboot=true
+export isnetboot
 
-echo "Initializing network..."
-net_init
+# Mount the ISO that lives beside this file on the same device
+# ($cmddevice) resolves to the device this script was loaded from
+loopback loop0 ($cmddevice)/installer.iso
+set root=loop0
 
-echo "Configuring network boot..."
-set prefix=(http,$net_default_server)/{{VERSION}}
-set root=$prefix
-
-echo "Loading EVE-OS GRUB configuration..."
-configfile ($prefix)/grub/grub.cfg
+# Chain to the real GRUB configuration inside the ISO
+configfile ($root)/EFI/BOOT/grub.cfg
