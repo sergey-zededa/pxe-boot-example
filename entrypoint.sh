@@ -680,7 +680,6 @@ fi
             else
                 echo "✗ Latest directory verification completed with ${VERIFY_ERRORS} errors"
             fi
-        fi
 
 
         # Update ipxe.efi.cfg with correct URL
