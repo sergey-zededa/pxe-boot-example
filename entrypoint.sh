@@ -1089,7 +1089,9 @@ EOF
 # Generate iPXE boot menu
 generate_boot_menu
 
-# 4. Configure boot files
+# 4. Configure services and boot files
+# Generate nginx configuration first so HTTP serves /data/httpboot
+generate_nginx_conf
 generate_autoexec
 generate_dnsmasq_conf
 
