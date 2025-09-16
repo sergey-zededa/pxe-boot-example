@@ -465,57 +465,37 @@ ensure_version_assets() {
         local temp_iso_dir="$dir/temp_iso_extract"
         mkdir -p "$temp_iso_dir"
         
-        # Extract all relevant files from ISO
-        echo "Extracting files from installer.iso..."
+        # Extract specific files from ISO using known EVE-OS structure
+        echo "Extracting files from installer.iso using EVE-OS structure..."
         if 7z x "$dir/installer.iso" -o"$temp_iso_dir" -y >/dev/null 2>&1; then
-            echo "ISO extraction successful, locating required files..."
+            echo "ISO extraction successful, copying required files..."
             
-            # Find and copy kernel if missing
-            if [ ! -f "$dir/kernel" ]; then
-                for kernel_path in "$temp_iso_dir/boot/kernel" "$temp_iso_dir/kernel" "$temp_iso_dir/vmlinuz" "$temp_iso_dir/boot/vmlinuz"; do
-                    if [ -f "$kernel_path" ]; then
-                        echo "Found kernel at: $kernel_path"
-                        cp "$kernel_path" "$dir/kernel"
-                        changed=1
-                        break
-                    fi
-                done
+            # Copy kernel from boot/kernel (actual EVE-OS location)
+            if [ ! -f "$dir/kernel" ] && [ -f "$temp_iso_dir/boot/kernel" ]; then
+                echo "Extracting kernel from boot/kernel"
+                cp "$temp_iso_dir/boot/kernel" "$dir/kernel"
+                changed=1
             fi
             
-            # Find and copy initrd if missing
-            if [ ! -f "$dir/initrd.img" ]; then
-                for initrd_path in "$temp_iso_dir/boot/initrd.img" "$temp_iso_dir/initrd.img" "$temp_iso_dir/boot/initrd" "$temp_iso_dir/initrd"; do
-                    if [ -f "$initrd_path" ]; then
-                        echo "Found initrd at: $initrd_path"
-                        cp "$initrd_path" "$dir/initrd.img"
-                        changed=1
-                        break
-                    fi
-                done
+            # Copy initrd from boot/initrd.img (actual EVE-OS location)
+            if [ ! -f "$dir/initrd.img" ] && [ -f "$temp_iso_dir/boot/initrd.img" ]; then
+                echo "Extracting initrd from boot/initrd.img"
+                cp "$temp_iso_dir/boot/initrd.img" "$dir/initrd.img"
+                changed=1
             fi
             
-            # Find and copy ucode.img if missing
-            if [ ! -f "$dir/ucode.img" ]; then
-                for ucode_path in "$temp_iso_dir/ucode.img" "$temp_iso_dir/boot/ucode.img" "$temp_iso_dir/microcode.img"; do
-                    if [ -f "$ucode_path" ]; then
-                        echo "Found ucode at: $ucode_path"
-                        cp "$ucode_path" "$dir/ucode.img"
-                        changed=1
-                        break
-                    fi
-                done
+            # Copy ucode from boot/ucode.img (actual EVE-OS location)
+            if [ ! -f "$dir/ucode.img" ] && [ -f "$temp_iso_dir/boot/ucode.img" ]; then
+                echo "Extracting ucode from boot/ucode.img"
+                cp "$temp_iso_dir/boot/ucode.img" "$dir/ucode.img"
+                changed=1
             fi
             
-            # Find and copy rootfs_installer.img if missing
-            if [ ! -f "$dir/rootfs_installer.img" ]; then
-                for rootfs_path in "$temp_iso_dir/rootfs_installer.img" "$temp_iso_dir/rootfs.img" "$temp_iso_dir/boot/rootfs.img" "$temp_iso_dir/live/filesystem.squashfs"; do
-                    if [ -f "$rootfs_path" ]; then
-                        echo "Found rootfs at: $rootfs_path"
-                        cp "$rootfs_path" "$dir/rootfs_installer.img"
-                        changed=1
-                        break
-                    fi
-                done
+            # Copy rootfs from root level (actual EVE-OS location)
+            if [ ! -f "$dir/rootfs_installer.img" ] && [ -f "$temp_iso_dir/rootfs_installer.img" ]; then
+                echo "Extracting rootfs_installer from root level"
+                cp "$temp_iso_dir/rootfs_installer.img" "$dir/rootfs_installer.img"
+                changed=1
             fi
             
         else
@@ -529,17 +509,11 @@ ensure_version_assets() {
         echo "Warning: ${dir}/installer.iso not found; cannot extract additional assets"
     fi
     
-    # Create empty placeholder files for any still missing optional files to prevent 404 errors
-    if [ ! -f "$dir/ucode.img" ]; then
-        echo "Creating empty ucode.img placeholder to prevent 404 errors"
-        touch "$dir/ucode.img"
-        changed=1
-    fi
-    
-    if [ ! -f "$dir/rootfs_installer.img" ]; then
-        echo "Creating empty rootfs_installer.img placeholder to prevent 404 errors"
-        touch "$dir/rootfs_installer.img"
-        changed=1
+    # Log extraction results
+    if [ "$changed" -eq 1 ]; then
+        echo "Successfully extracted additional files from installer.iso"
+    else
+        echo "No additional files needed to be extracted"
     fi
 
     # Ensure permissions on any (new) files
@@ -601,16 +575,20 @@ setup_eve_versions() {
                 fi
             done
 
-            # Attempt to extract kernel assets from installer.iso as a fallback
+            # Extract kernel assets from installer.iso using known EVE-OS paths
             iso_path="/data/httpboot/${version}/installer.iso"
             extract_dir="/data/httpboot/${version}"
             if [ -f "$iso_path" ]; then
-                echo "Extracting kernel components from $iso_path (fallback)..."
-                if 7z x "$iso_path" -o"$extract_dir" boot/kernel boot/initrd.img ucode.img rootfs.img -y >/dev/null 2>&1 || \
-                   7z x "$iso_path" -o"$extract_dir" kernel initrd.img ucode.img rootfs.img -y >/dev/null 2>&1; then
+                echo "Extracting kernel components from installer.iso using EVE-OS paths..."
+                # Extract specific files using actual EVE-OS structure
+                if 7z x "$iso_path" -o"$extract_dir" boot/kernel boot/initrd.img boot/ucode.img rootfs_installer.img -y >/dev/null 2>&1; then
+                    # Move files from boot/ to root level
                     [ -f "$extract_dir/boot/kernel" ] && mv "$extract_dir/boot/kernel" "$extract_dir/kernel" || true
                     [ -f "$extract_dir/boot/initrd.img" ] && mv "$extract_dir/boot/initrd.img" "$extract_dir/initrd.img" || true
+                    [ -f "$extract_dir/boot/ucode.img" ] && mv "$extract_dir/boot/ucode.img" "$extract_dir/ucode.img" || true
+                    # rootfs_installer.img is already at root level
                     rmdir "$extract_dir/boot" 2>/dev/null || true
+                    echo "Successfully extracted files using EVE-OS paths"
                 else
                     echo "Warning: Unable to extract kernel assets from installer.iso"
                 fi
