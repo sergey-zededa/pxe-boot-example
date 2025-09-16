@@ -42,7 +42,8 @@ iseq ${net0/gateway} 0.0.0.0 && echo Invalid gateway && goto retry_dhcp ||
 
 # Configure boot server - use DHCP next-server if available, otherwise fallback to SERVER_IP
 set boot-server {{SERVER_IP}}
-set next-server ${next-server} || set next-server ${boot-server}
+# If DHCP didn't provide next-server (option 66), fall back to configured SERVER_IP
+isset ${next-server} || set next-server ${boot-server}
 set boot-url http://${next-server}
 
 echo Boot Configuration:
