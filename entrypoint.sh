@@ -658,6 +658,17 @@ fi
             # Set correct ownership and permissions
             echo "Setting latest directory permissions..."
             set_file_permissions
+
+            # Ensure latest has our GRUB stub (overwrite if upstream copied one)
+            if [ -d "/data/httpboot/latest/EFI/BOOT" ]; then
+                process_template \
+                    "/config/grub.cfg.template" \
+                    "/data/httpboot/latest/EFI/BOOT/grub.cfg" \
+                    "SERVER_IP=${SERVER_IP}
+VERSION=${version}"
+                chown www-data:www-data "/data/httpboot/latest/EFI/BOOT/grub.cfg"
+                chmod 644 "/data/httpboot/latest/EFI/BOOT/grub.cfg"
+            fi
             
             # Verify latest directory structure
             echo "Verifying latest directory structure:"
@@ -691,6 +702,17 @@ fi
             else
                 echo "✗ Latest directory verification completed with ${VERIFY_ERRORS} errors"
             fi
+        fi
+
+        # Ensure our GRUB stub is in place even for cached versions
+        if [ -d "/data/httpboot/${version}/EFI/BOOT" ]; then
+            process_template \
+                "/config/grub.cfg.template" \
+                "/data/httpboot/${version}/EFI/BOOT/grub.cfg" \
+                "SERVER_IP=${SERVER_IP}
+VERSION=${version}"
+            chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
+            chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
         fi
 
         # Update ipxe.efi.cfg with correct URL

@@ -2,16 +2,22 @@
 # This stub is loaded via HTTP by iPXE and must then fetch the real GRUB config
 # from within the installer ISO. Keeping this minimal avoids module/version drift.
 
+# Load only the modules we need for HTTP + ISO loopback
+insmod http
+insmod loopback
+insmod iso9660
+
 echo "Downloading installer. This may take some time. Please wait patiently."
 
 # Mark this as a netboot so downstream GRUB config can adapt
 set isnetboot=true
 export isnetboot
 
-# Mount the ISO that lives beside this file on the same device
-# ($cmddevice) resolves to the device this script was loaded from
-loopback loop0 ($cmddevice)/installer.iso
-set root=loop0
+# The BOOTX64.EFI is in .../<version>/EFI/BOOT, while installer.iso is at .../<version>/installer.iso
+# cmdpath points to the directory containing this file (EFI/BOOT). Go up two levels.
+set iso_path=($cmdpath)/../../installer.iso
 
-# Chain to the real GRUB configuration inside the ISO
+# Mount the installer ISO and chain to its GRUB config
+loopback loop0 $iso_path
+set root=loop0
 configfile ($root)/EFI/BOOT/grub.cfg
