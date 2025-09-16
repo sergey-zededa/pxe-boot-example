@@ -1,23 +1,21 @@
-# EVE-OS netboot: bootstrap GRUB from installer ISO located next to this file
-# This stub is loaded via HTTP by iPXE and must then fetch the real GRUB config
-# from within the installer ISO. Keeping this minimal avoids module/version drift.
+# GRUB configuration for direct kernel loading via HTTP
 
-# Load only the modules we need for HTTP + ISO loopback
-insmod http
-insmod loopback
-insmod iso9660
+# Set the base URL using template variables provided by the entrypoint script
+set root_url=http://{{SERVER_IP}}/{{VERSION}}
 
-echo "Downloading installer. This may take some time. Please wait patiently."
+# Define kernel arguments (copied from the original ipxe.efi.cfg)
+set console_args="console=ttyS0 console=tty0"
+set installer_args="root=/initrd.image find_boot=netboot overlaytmpfs fastboot"
 
-# Mark this as a netboot so downstream GRUB config can adapt
-set isnetboot=true
-export isnetboot
+echo "Loading EVE-OS kernel and initramfs via HTTP..."
 
-# Use absolute HTTP URL for installer.iso since $cmdpath is unreliable in network boot
-# {{SERVER_IP}} and {{VERSION}} are substituted by the entrypoint script
-set iso_url=http://{{SERVER_IP}}/{{VERSION}}/installer.iso
+# Load the kernel directly via HTTP. GRUB's http module uses the (http,SERVER)/PATH syntax.
+linux (http,{{SERVER_IP}})/{{VERSION}}/kernel ${console_args} ${installer_args}
 
-# Mount the installer ISO and chain to its GRUB config
-loopback loop0 $iso_url
-set root=loop0
-configfile ($root)/EFI/BOOT/grub.cfg
+# Load all required initrd images. They are loaded into memory sequentially.
+initrd (http,{{SERVER_IP}})/{{VERSION}}/ucode.img
+initrd (http,{{SERVER_IP}})/{{VERSION}}/initrd.img
+initrd (http,{{SERVER_IP}})/{{VERSION}}/rootfs_installer.img
+
+echo "Starting EVE-OS installer..."
+boot

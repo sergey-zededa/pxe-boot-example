@@ -473,9 +473,16 @@ setup_eve_versions() {
                 exit 1
             fi
 
-            # List contents for debugging
-            echo "Archive contents:"
-            ls -la "${TEMP_DIR}"
+            # After extracting the tar, extract kernel assets from the ISO
+            iso_path="/data/httpboot/${version}/installer.iso"
+            extract_dir="/data/httpboot/${version}"
+            if [ -f "$iso_path" ]; then
+                echo "Extracting kernel components from $iso_path..."
+                # Use 7z to extract the required files, overwriting if they exist
+                7z x "$iso_path" -o"$extract_dir" kernel ucode.img initrd.img rootfs.img -y
+            else
+                echo "Warning: installer.iso not found for version ${version}. Cannot extract kernel assets."
+            fi
 
             # Set up directory structure
             mkdir -p "/data/httpboot/${version}/EFI/BOOT/"
@@ -723,27 +730,20 @@ VERSION=${version}"
 cat > "/data/httpboot/${version}/ipxe.efi.cfg" <<- EOF
 #!ipxe
 
-dhcp
-
-# Set boot parameters (pin server IP; ignore DHCP next-server)
+# Set boot parameters. The URL is all that's needed to find the GRUB EFI.
 set url http://${SERVER_IP}/${version}/
 set next-server ${SERVER_IP}
-set console console=ttyS0 console=ttyS1 console=ttyS2 console=ttyAMA0 console=ttyAMA1 console=tty0
-set eve_args eve_soft_serial=\${mac:hexhyp} eve_reboot_after_install getty
-set installer_args root=/initrd.image find_boot=netboot overlaytmpfs fastboot
 
-# Hardware-specific console settings
-iseq \${smbios/manufacturer} Huawei && set console console=ttyAMA0,115200n8 ||
-iseq \${smbios/manufacturer} Huawei && set platform_tweaks pcie_aspm=off pci=pcie_bus_perf ||
-iseq \${smbios/manufacturer} Supermicro && set console console=ttyS1,115200n8 ||
-iseq \${smbios/manufacturer} QEMU && set console console=hvc0 console=ttyS0 ||
+echo "Chainloading GRUB for ${version}..."
 
-# Chain to appropriate bootloader
+# Chain to the GRUB EFI bootloader for the correct architecture
 iseq \${buildarch} x86_64 && chain \${url}EFI/BOOT/BOOTX64.EFI ||
 iseq \${buildarch} arm64 && chain \${url}EFI/BOOT/BOOTAA64.EFI ||
 iseq \${buildarch} riscv64 && chain \${url}EFI/BOOT/BOOTRISCV64.EFI ||
 
-boot
+echo "Error: Failed to chainload GRUB EFI. Pausing for 10 seconds."
+sleep 10
+exit 1
 EOF
     sed -i "s|^#\s*set url.*|set url http://${SERVER_IP}/${version}/|; s|^\s*set url.*|set url http://${SERVER_IP}/${version}/|" "/data/httpboot/${version}/ipxe.efi.cfg"
 
