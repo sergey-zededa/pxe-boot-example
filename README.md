@@ -10,6 +10,7 @@ A minimalistic, easily deployable, self-contained Docker-based iPXE server for n
 - **Flexible DHCP**: Support for both standalone DHCP server and DHCP proxy modes
 - **Hardware Detection**: Automatic console and platform-specific configuration
 - **Comprehensive Error Handling**: Detailed error messages and automatic recovery
+- **Robust HTTP Handling**: Case-insensitive handling for .EFI/.IPXE/.CFG to satisfy UEFI HTTP Boot requirements
 
 ## Quick Start
 

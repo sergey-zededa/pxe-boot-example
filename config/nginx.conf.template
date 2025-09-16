@@ -83,8 +83,8 @@ http {
             autoindex on;
         }
         
-        # Handle iPXE files
-        location ~ \.ipxe$ {
+        # Handle iPXE files (case-insensitive extensions)
+        location ~* \.ipxe$ {
             default_type application/x-ipxe;
             add_header Content-Type application/x-ipxe always;
             add_header Content-Length $content_length always;
@@ -93,8 +93,8 @@ http {
             keepalive_timeout 60;
         }
         
-        # Handle EFI binaries
-        location ~ \.efi$ {
+        # Handle EFI binaries (case-insensitive for .efi/.EFI)
+        location ~* \.efi$ {
             default_type application/x-pxeboot;
             add_header Content-Type application/x-pxeboot always;
             add_header Content-Length $content_length always;
@@ -116,8 +116,8 @@ http {
             }
         }
 
-        # Handle iPXE cfg files
-        location ~ \.cfg$ {
+        # Handle iPXE cfg files (case-insensitive)
+        location ~* \.cfg$ {
             default_type application/octet-stream;
             add_header Content-Type application/octet-stream always;
             add_header Content-Length $content_length always;
@@ -139,8 +139,8 @@ http {
             }
         }
         
-        # Handle other boot files (images, ISOs)
-        location ~ \.(img|iso)$ {
+        # Handle other boot files (images, ISOs) case-insensitively
+        location ~* \.(img|iso)$ {
             default_type application/octet-stream;
             add_header Content-Type application/octet-stream always;
             add_header Content-Length $content_length always;
