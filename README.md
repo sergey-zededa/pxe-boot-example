@@ -1,6 +1,8 @@
-# EVE-OS iPXE Server
+# EVE-OS iPXE Server - ✅ **WORKING CONFIGURATION**
 
 A minimalistic, easily deployable, self-contained Docker-based iPXE server for network booting and installing multiple versions of EVE-OS.
+
+> **Status**: ✅ **FULLY FUNCTIONAL** - Successfully tested with EVE-OS 14.5.1-lts network installation
 
 ## Features
 
@@ -9,22 +11,39 @@ A minimalistic, easily deployable, self-contained Docker-based iPXE server for n
 - **Persistent Caching**: Cache EVE-OS images using Docker volumes
 - **Flexible DHCP**: Support for both standalone DHCP server and DHCP proxy modes
 - **Hardware Detection**: Automatic console and platform-specific configuration
+- **Graceful Optional File Handling**: Continue boot process when optional files (ucode.img, rootfs_installer.img) are missing
+- **Template-Based Configuration**: Reliable configuration generation using templates
 - **Comprehensive Error Handling**: Detailed error messages and automatic recovery
 - **Robust HTTP Handling**: Case-insensitive handling for .EFI/.IPXE/.CFG to satisfy UEFI HTTP Boot requirements
+- **✅ Verified Working**: Successfully tested with QEMU and EVE-OS 14.5.1-lts installation
 
 ## Quick Start
 
-1. Build the container:
+### 1. Build the container:
 ```sh
 docker build -t ipxe-server:latest .
 ```
 
-2. Create a data directory:
+### 2. Create a data directory:
 ```sh
 mkdir -p ipxe_data
 ```
 
-3. Run in standalone DHCP mode:
+### 3a. Run in proxy DHCP mode (✅ **VERIFIED WORKING**):
+```sh
+# This configuration has been successfully tested with EVE-OS 14.5.1-lts
+docker run --rm -it --net=host --privileged \
+    -v "$PWD/ipxe_data:/data" \
+    -e EVE_VERSIONS="14.5.1-lts" \
+    -e SERVER_IP="192.168.0.4" \
+    -e LISTEN_INTERFACE="eth0" \
+    -e DHCP_MODE="proxy" \
+    -e PRIMARY_DHCP_IP="192.168.0.1" \
+    -e LOG_LEVEL="debug" \
+    ipxe-server:latest
+```
+
+### 3b. Run in standalone DHCP mode:
 ```sh
 docker run -d --net=host --privileged \
     -v "$PWD/ipxe_data:/data" \

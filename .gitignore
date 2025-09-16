@@ -1,6 +1,10 @@
 # Downloaded and generated files
 ipxe_data/
 test/ipxe_data/
+*.iso
+*.tar
+*.tar.gz
+*.zip
 
 # OS-specific files
 .DS_Store
@@ -9,6 +13,7 @@ test/ipxe_data/
 .Trashes
 Thumbs.db
 ehthumbs.db
+Desktop.ini
 
 # IDE/Editor files
 .idea/
@@ -16,8 +21,23 @@ ehthumbs.db
 *.swp
 *.swo
 *~
+.project
+.settings/
+
+# Temporary files
+*.tmp
+*.bak
+*.old
+*.log
 
 # Test files
 test/*.log
 test/*.qcow2
-.DS_Store
+test/*.pid
+
+# Docker build context
+.dockerignore
+
+# Local configuration overrides
+local.env
+.env.local
