@@ -40,11 +40,12 @@ iseq ${net0/ip} 0.0.0.0 && echo Invalid IP configuration && goto retry_dhcp ||
 iseq ${net0/netmask} 0.0.0.0 && echo Invalid network mask && goto retry_dhcp ||
 iseq ${net0/gateway} 0.0.0.0 && echo Invalid gateway && goto retry_dhcp ||
 
-# Configure boot server - use DHCP next-server if available, otherwise fallback to SERVER_IP
+# Configure boot server explicitly and ignore DHCP next-server
+# Some environments set ${next-server} to the primary DHCP server (option 54)
+# which can cause iPXE to fetch from the wrong host. Always use our SERVER_IP.
 set boot-server {{SERVER_IP}}
-# If DHCP didn't provide next-server (option 66), fall back to configured SERVER_IP
-isset ${next-server} || set next-server ${boot-server}
-set boot-url http://${next-server}
+set next-server ${boot-server}
+set boot-url http://${boot-server}
 # Ensure HEAD requests succeed from picky firmware by allowing follow-up GET.
 # iPXE will perform a GET; no change needed here, but leave a breadcrumb in logs.
 echo Boot Configuration:

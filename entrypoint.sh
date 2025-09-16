@@ -660,12 +660,14 @@ fi
         sed -i "s|^#\?set url.*|set url http://${SERVER_IP}/${version}/|" "/data/httpboot/${version}/ipxe.efi.cfg"
     # Use sed to handle both commented and uncommented versions with proper spacing
     # Create iPXE configuration file
-    cat > "/data/httpboot/${version}/ipxe.efi.cfg" <<- EOF
+cat > "/data/httpboot/${version}/ipxe.efi.cfg" <<- EOF
 #!ipxe
+
 dhcp
 
-# Set boot parameters
+# Set boot parameters (pin server IP; ignore DHCP next-server)
 set url http://${SERVER_IP}/${version}/
+set next-server ${SERVER_IP}
 set console console=ttyS0 console=ttyS1 console=ttyS2 console=ttyAMA0 console=ttyAMA1 console=tty0
 set eve_args eve_soft_serial=\${mac:hexhyp} eve_reboot_after_install getty
 set installer_args root=/initrd.image find_boot=netboot overlaytmpfs fastboot

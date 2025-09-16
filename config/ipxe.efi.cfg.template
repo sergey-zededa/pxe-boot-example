@@ -4,9 +4,9 @@
 set debug all
 set debug dhcp,net
 
-# Force our server address
+# Force our server address (ignore DHCP next-server)
 set next-server {{SERVER_IP}}
-set boot-url http://${next-server}/{{VERSION}}
+set boot-url http://{{SERVER_IP}}/{{VERSION}}
 
 # Initialize network
 :retry_net
