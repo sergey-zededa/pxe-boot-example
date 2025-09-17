@@ -1,42 +1,58 @@
-# EVE-OS PXE/HTTP netboot GRUB configuration
-# Based on pkg/eve/installer/grub_installer.cfg and official netboot flow
+# EVE-OS PXE/HTTP netboot GRUB configuration - DIAGNOSTIC VERSION
+# Testing if GRUB can read our config and execute basic commands
 
-echo "EVE-OS {{VERSION}} Network Boot"
-echo "Mounting installer.iso via HTTP loopback..."
+echo "=== GRUB CONFIG LOADED SUCCESSFULLY ==="
+echo "EVE-OS {{VERSION}} Network Boot - Diagnostic Mode"
+echo "Server: {{SERVER_IP}}"
+echo "Testing basic GRUB functionality..."
 
-# Set up the environment for netboot as per EVE-OS pattern
-set timeout=5
+# Set basic timeout
+set timeout=10
 set default=0
 
-# Set the install partition reference (for netboot, this is the HTTP location)
+# Test basic variable setting
 set install_part="(http,{{SERVER_IP}})/{{VERSION}}"
-set cmddevice="$install_part"
+echo "Install partition set to: $install_part"
 
-# Mount the installer.iso via loopback as expected by EVE-OS
-echo "Attempting to mount installer.iso from $install_part/installer.iso"
-if loopback loop0 "$install_part/installer.iso"; then
-    echo "Successfully mounted installer.iso as loop0"
+# Test if we can list HTTP directory
+echo "Testing HTTP directory listing..."
+ls $install_part/
+
+# Test if installer.iso exists
+echo "Testing installer.iso accessibility..."
+if [ -f "$install_part/installer.iso" ]; then
+    echo "SUCCESS: installer.iso found"
     
-    # Set netboot flag and configure root
-    set isnetboot=true
-    export isnetboot
-    set root=loop0
-    
-    # Load the EVE-OS installer configuration from inside the ISO
-    echo "Loading EVE-OS installer configuration..."
-    if [ -f "(loop0)/EFI/BOOT/grub.cfg" ]; then
-        configfile "(loop0)/EFI/BOOT/grub.cfg"
+    # Try simple loopback mount test
+    echo "Attempting loopback mount..."
+    if loopback loop0 "$install_part/installer.iso"; then
+        echo "SUCCESS: Loopback mount succeeded"
+        echo "Listing ISO contents:"
+        ls (loop0)/
+        
+        # Try to find grub.cfg in ISO
+        if [ -f "(loop0)/EFI/BOOT/grub.cfg" ]; then
+            echo "SUCCESS: Found grub.cfg in ISO"
+            echo "Loading EVE-OS configuration from ISO..."
+            set isnetboot=true
+            export isnetboot
+            set cmddevice="$install_part"
+            export cmddevice
+            configfile "(loop0)/EFI/BOOT/grub.cfg"
+        else
+            echo "ERROR: No grub.cfg found in ISO"
+            ls "(loop0)/EFI/BOOT/"
+        fi
     else
-        echo "ERROR: Missing grub.cfg in installer.iso"
-        echo "Available files:"
-        ls "(loop0)/EFI/BOOT/"
-        echo "Dropping to GRUB shell for debugging"
+        echo "ERROR: Loopback mount failed"
+        echo "Possible causes:"
+        echo "1. HTTP module not available in GRUB"
+        echo "2. ISO file corrupted or inaccessible"
+        echo "3. Network connectivity issues"
     fi
 else
-    echo "ERROR: Failed to mount installer.iso"
-    echo "Attempted: $install_part/installer.iso"
-    echo "Available commands for debugging:"
-    echo "  ls $install_part/"
-    echo "  configfile <path>"
-    echo "  halt"
+    echo "ERROR: installer.iso not found at $install_part/installer.iso"
 fi
+
+echo "=== DIAGNOSTIC COMPLETE - Dropping to GRUB shell ==="
+echo "Available commands: ls, cat, configfile, halt, reboot"
