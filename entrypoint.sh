@@ -611,12 +611,18 @@ setup_eve_versions() {
                 echo "Copying EFI boot files..."
                 cp -r "${TEMP_DIR}/EFI" "/data/httpboot/${version}/"
                 
-                # Keep the official grub.cfg in version directory for HTTP access
+                # EMERGENCY: Copy grub.cfg to TFTP directory since GRUB uses TFTP
                 if [ -f "${TEMP_DIR}/EFI/BOOT/grub.cfg" ]; then
-                    echo "Copying official GRUB config for ${version}..."
+                    echo "Copying official GRUB config for ${version} to HTTP location..."
                     cp "${TEMP_DIR}/EFI/BOOT/grub.cfg" "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
                     chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
                     chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
+                    
+                    echo "Also copying grub.cfg to TFTP directory..."
+                    mkdir -p "/tftpboot/EFI/BOOT"
+                    cp "${TEMP_DIR}/EFI/BOOT/grub.cfg" "/tftpboot/EFI/BOOT/grub.cfg"
+                    chmod 644 "/tftpboot/EFI/BOOT/grub.cfg"
+                    chown dnsmasq:dnsmasq "/tftpboot/EFI/BOOT/grub.cfg"
                 else
                     echo "Warning: Official grub.cfg not found in archive"
                 fi
