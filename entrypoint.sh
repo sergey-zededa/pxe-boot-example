@@ -748,11 +748,11 @@ fi
             echo "Setting ${version} as default version"
             
             echo "Setting up TFTP boot files..."
-            # Copy and configure TFTP boot files
-            if [ -f "/data/httpboot/${DEFAULT_VERSION}/ipxe.efi" ]; then
-                echo "Setting up UEFI TFTP boot file..."
-                cp "/data/httpboot/${DEFAULT_VERSION}/ipxe.efi" /tftpboot/ipxe.efi
-                chown dnsmasq:dnsmasq /tftpboot/ipxe.efi
+            # Copy and configure TFTP boot files - use EVE-OS BOOTX64.EFI directly
+            if [ -f "/data/httpboot/${DEFAULT_VERSION}/EFI/BOOT/BOOTX64.EFI" ]; then
+                echo "Setting up EVE-OS UEFI bootloader..."
+                cp "/data/httpboot/${DEFAULT_VERSION}/EFI/BOOT/BOOTX64.EFI" /tftpboot/BOOTX64.EFI
+                chown dnsmasq:dnsmasq /tftpboot/BOOTX64.EFI
                 chmod 644 /tftpboot/ipxe.efi
             else
                 echo "Warning: ipxe.efi not found in version ${DEFAULT_VERSION}"
