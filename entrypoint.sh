@@ -604,16 +604,29 @@ setup_eve_versions() {
                 echo "Copying EFI boot files..."
                 cp -r "${TEMP_DIR}/EFI" "/data/httpboot/${version}/"
                 
-                # Copy official grub.cfg AFTER EFI directory copy to avoid overwrite
-                if [ -f "${TEMP_DIR}/EFI/BOOT/grub.cfg" ]; then
-                    echo "Copying official GRUB config for ${version} (after EFI copy)..."
-                    cp "${TEMP_DIR}/EFI/BOOT/grub.cfg" "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
-                    chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
-                    chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
-                    echo "✓ Official grub.cfg copied and secured"
-                else
-                    echo "Warning: Official grub.cfg not found in archive"
-                fi
+                # CRITICAL: Create HTTP-based grub.cfg instead of copying TFTP-based original
+                echo "Creating HTTP-based GRUB config for ${version}..."
+                sed -e "s/{{VERSION}}/${version}/g" -e "s/{{SERVER_IP}}/${SERVER_IP}/g" \
+                    "/config/grub_commands.cfg.template" > "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
+                chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
+                chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
+                
+                # Also copy to TFTP directory since GRUB is using TFTP protocol
+                echo "Copying HTTP-based grub.cfg to TFTP directory..."
+                mkdir -p "/tftpboot/EFI/BOOT"
+                cp "/data/httpboot/${version}/EFI/BOOT/grub.cfg" "/tftpboot/EFI/BOOT/grub.cfg"
+                chmod 644 "/tftpboot/EFI/BOOT/grub.cfg"
+                chown dnsmasq:dnsmasq "/tftpboot/EFI/BOOT/grub.cfg"
+                echo "✓ HTTP-based grub.cfg created for both HTTP and TFTP access"
+                
+                # Create missing GRUB module lists to prevent TFTP errors
+                echo "Creating GRUB module lists..."
+                mkdir -p "/tftpboot/EFI/BOOT/x86_64-efi"
+                echo "# Minimal module list" > "/tftpboot/EFI/BOOT/x86_64-efi/command.lst"
+                echo "# Minimal module list" > "/tftpboot/EFI/BOOT/x86_64-efi/fs.lst"
+                echo "# Minimal module list" > "/tftpboot/EFI/BOOT/x86_64-efi/crypto.lst"
+                echo "# Minimal module list" > "/tftpboot/EFI/BOOT/x86_64-efi/terminal.lst"
+                chown -R dnsmasq:dnsmasq "/tftpboot/EFI/BOOT/"
             elif [ -f "${TEMP_DIR}/installer.iso" ]; then
                 echo "Found installer.iso, extracting EFI files..."
                 ISO_EXTRACT_DIR="${TEMP_DIR}/iso"
