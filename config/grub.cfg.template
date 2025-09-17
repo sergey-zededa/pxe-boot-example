@@ -1,45 +1,42 @@
-# Custom GRUB configuration for EVE-OS HTTP netboot
-# This file replaces the standard GRUB config to work with our HTTP server
+# EVE-OS PXE/HTTP netboot GRUB configuration
+# Based on pkg/eve/installer/grub_installer.cfg and official netboot flow
 
-echo "EVE-OS {{VERSION}} - Downloading installer via HTTP"
-echo "This may take some time. Please wait patiently."
+echo "EVE-OS {{VERSION}} Network Boot"
+echo "Mounting installer.iso via HTTP loopback..."
 
-# Set timeout and basic settings
+# Set up the environment for netboot as per EVE-OS pattern
 set timeout=5
 set default=0
 
-# Try to download and mount the installer ISO from HTTP
-echo "Attempting to mount installer.iso via HTTP..."
+# Set the install partition reference (for netboot, this is the HTTP location)
+set install_part="(http,{{SERVER_IP}})/{{VERSION}}"
+set cmddevice="$install_part"
 
-# GRUB HTTP syntax: (http,server)/path
-# Try the HTTP mount directly
-if loopback loop0 (http,{{SERVER_IP}})/{{VERSION}}/installer.iso; then
-    echo "Successfully mounted installer.iso via HTTP"
-    set root=loop0
+# Mount the installer.iso via loopback as expected by EVE-OS
+echo "Attempting to mount installer.iso from $install_part/installer.iso"
+if loopback loop0 "$install_part/installer.iso"; then
+    echo "Successfully mounted installer.iso as loop0"
+    
+    # Set netboot flag and configure root
     set isnetboot=true
     export isnetboot
+    set root=loop0
     
-    # Now load the real EVE configuration from inside the ISO
-    if [ -f ($root)/EFI/BOOT/grub.cfg ]; then
-        echo "Loading EVE-OS configuration from installer..."
-        configfile ($root)/EFI/BOOT/grub.cfg
+    # Load the EVE-OS installer configuration from inside the ISO
+    echo "Loading EVE-OS installer configuration..."
+    if [ -f "(loop0)/EFI/BOOT/grub.cfg" ]; then
+        configfile "(loop0)/EFI/BOOT/grub.cfg"
     else
-        echo "ERROR: grub.cfg not found in installer.iso"
-        echo "Available files in ISO:"
-        ls ($root)/EFI/BOOT/
+        echo "ERROR: Missing grub.cfg in installer.iso"
+        echo "Available files:"
+        ls "(loop0)/EFI/BOOT/"
+        echo "Dropping to GRUB shell for debugging"
     fi
 else
-    echo "ERROR: Failed to mount installer.iso via HTTP"
-    echo "Searched: (http,{{SERVER_IP}})/{{VERSION}}/installer.iso"
-    echo ""
-    echo "Troubleshooting:"
-    echo "1. Verify HTTP server is running"
-    echo "2. Check if installer.iso exists and is accessible"
-    echo "3. Test URL: http://{{SERVER_IP}}/{{VERSION}}/installer.iso"
-    echo ""
-    echo "Available GRUB commands:"
-    echo "  ls (http,{{SERVER_IP}})/{{VERSION}}/  - List files"
-    echo "  configfile <file>                    - Load config"
-    echo "  boot                                 - Boot current settings"
-    echo "  halt                                 - Shutdown"
+    echo "ERROR: Failed to mount installer.iso"
+    echo "Attempted: $install_part/installer.iso"
+    echo "Available commands for debugging:"
+    echo "  ls $install_part/"
+    echo "  configfile <path>"
+    echo "  halt"
 fi
