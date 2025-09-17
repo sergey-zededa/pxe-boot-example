@@ -14,23 +14,17 @@ dhcp-match=set:efi64,option:client-arch,7  # EFI x64
 dhcp-match=set:efi64,option:client-arch,9  # EFI x64
 dhcp-match=set:ipxe-ok,option:user-class,iPXE
 
-# Server options - Force our server for all PXE-related options
-# Option 66: TFTP server (used by GRUB for cmddevice)
-dhcp-option=66,{{SERVER_IP}}
-# Option 54: DHCP server identifier (override primary DHCP)
-dhcp-option=54,{{SERVER_IP}}
-# Option 150: TFTP server list (additional PXE option)
-dhcp-option=150,{{SERVER_IP}}
-# Avoid packing boot filename into vendor options
-dhcp-no-override
-
 # DHCP Configuration (mode-specific) - CRITICAL for proxy mode
 {{DHCP_CONFIG}}
 
-# CRITICAL: Force PXE clients to use our server for all PXE operations
-# This overrides any settings from the primary DHCP server
-dhcp-option=tag:efi64,option:tftp-server-name,{{SERVER_IP}}
-dhcp-option=tag:efi64,option:bootfile-name,snponly.efi
+# Force TFTP server - CRITICAL for GRUB to use correct server
+dhcp-option=option:tftp-server,{{SERVER_IP}}
+
+# Server options - Force our server for all PXE-related options
+# Option 66: TFTP server (used by GRUB for cmddevice)
+dhcp-option=66,{{SERVER_IP}}
+# Avoid packing boot filename into vendor options
+dhcp-no-override
 
 # Boot configuration for BIOS clients
 # Provide filename and set siaddr (server IP) explicitly
@@ -42,9 +36,8 @@ dhcp-boot=tag:!ipxe,tag:!efi64,undionly.kpxe,,{{SERVER_IP}}
 # Provide filename and siaddr explicitly - CRITICAL: Third parameter sets next-server!
 dhcp-boot=tag:!ipxe,tag:efi64,snponly.efi,,{{SERVER_IP}}
 
-# CRITICAL: Force next-server for ALL responses to override primary DHCP
-# This should make cmddevice point to our server instead of primary DHCP
-dhcp-option=tag:efi64,option:next-server,{{SERVER_IP}}
+# CRITICAL: The third parameter in dhcp-boot sets next-server (siaddr)
+# This is handled by the dhcp-boot lines above
 
 # Boot configuration for iPXE clients (HTTP chain)
 dhcp-boot=tag:ipxe,http://{{SERVER_IP}}/boot.ipxe
@@ -54,10 +47,7 @@ dhcp-boot=tag:ipxe,http://{{SERVER_IP}}/boot.ipxe
 pxe-service=X86-64_EFI,"PXE UEFI x86-64 (iPXE)",snponly.efi,{{SERVER_IP}}
 pxe-service=X86PC,"PXE BIOS (iPXE)",undionly.kpxe,{{SERVER_IP}}
 
-# Additional PXE options to ensure GRUB gets correct server
-# Force boot server to our IP for all PXE clients
-dhcp-option=tag:efi64,option:bootfile-name,snponly.efi
-dhcp-option=tag:efi64,option:server-ip-address,{{SERVER_IP}}
+# Additional PXE options handled by dhcp-boot and pxe-service above
 
 # Optional domain name configuration
 {{DOMAIN_CONFIG}}
