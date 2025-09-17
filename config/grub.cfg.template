@@ -1,0 +1,36 @@
+echo "Downloading EVE-OS installer. This may take some time. Please wait patiently."
+
+# Try to find installer.iso in the current HTTP root
+# In netboot, the grub.cfg is served from the same HTTP location as installer.iso
+if [ -f (http,{{SERVER_IP}})/{{VERSION}}/installer.iso ]; then
+    echo "Found installer.iso via HTTP"
+    loopback loop0 (http,{{SERVER_IP}})/{{VERSION}}/installer.iso
+elif [ -f /installer.iso ]; then
+    echo "Found installer.iso in root"
+    loopback loop0 /installer.iso  
+elif [ -f installer.iso ]; then
+    echo "Found installer.iso in current directory"
+    loopback loop0 installer.iso
+else
+    echo "ERROR: installer.iso not found!"
+    echo "Searched:"
+    echo "  (http,{{SERVER_IP}})/{{VERSION}}/installer.iso"
+    echo "  /installer.iso"
+    echo "  installer.iso"
+    echo ""
+    echo "Dropping to GRUB shell for debugging..."
+    echo "Available commands: ls, cat, help, boot, configfile"
+    echo "Try: ls (http,{{SERVER_IP}})/{{VERSION}}/"
+fi
+
+set root=loop0
+set isnetboot=true
+export isnetboot
+
+# Load the main GRUB configuration from inside the ISO
+if [ "$root" = "loop0" ]; then
+    configfile ($root)/EFI/BOOT/grub.cfg
+else
+    echo "ERROR: Could not mount installer.iso"
+    echo "Dropping to GRUB shell..."
+fi

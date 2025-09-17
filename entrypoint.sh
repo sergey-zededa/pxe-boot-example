@@ -598,8 +598,20 @@ setup_eve_versions() {
 
             # Set up directory structure
             mkdir -p "/data/httpboot/${version}/EFI/BOOT/"
-
+            
+            # Generate custom grub.cfg that can find installer.iso via HTTP
+            echo "Generating custom GRUB config for ${version}..."
+            GRUB_VARS=$(printf '%s\n' \
+                "SERVER_IP=${SERVER_IP}" \
+                "VERSION=${version}")
+            
+            process_template \
+                "/config/grub.cfg.template" \
+                "/data/httpboot/${version}/EFI/BOOT/grub.cfg" \
+                "$GRUB_VARS"
+            
             chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
+            chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
 
             # Handle EFI-related files first
             if [ -f "${TEMP_DIR}/EFI/BOOT/BOOTX64.EFI" ]; then
@@ -726,6 +738,22 @@ fi
 
         # Ensure required assets exist even for cached versions
         ensure_version_assets "${version}"
+        
+        # Generate/update custom grub.cfg for cached versions too
+        echo "Ensuring custom GRUB config for cached version ${version}..."
+        mkdir -p "/data/httpboot/${version}/EFI/BOOT/"
+        
+        GRUB_VARS=$(printf '%s\n' \
+            "SERVER_IP=${SERVER_IP}" \
+            "VERSION=${version}")
+        
+        process_template \
+            "/config/grub.cfg.template" \
+            "/data/httpboot/${version}/EFI/BOOT/grub.cfg" \
+            "$GRUB_VARS"
+        
+        chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
+        chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
 
         # Set up first version as default
         if [ -z "$DEFAULT_VERSION" ]; then
@@ -957,7 +985,6 @@ item reboot Reboot system
 item retry Retry network configuration
 item
 item --gap -- --------------------------------------------
-item --gap Version information:
 item --gap Selected version will boot in ${BOOT_MENU_TIMEOUT} seconds
 item --gap Server IP: ${SERVER_IP}
 item --gap Client IP: ${net0/ip}
