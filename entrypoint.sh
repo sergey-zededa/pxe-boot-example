@@ -599,22 +599,21 @@ setup_eve_versions() {
             # Set up directory structure
             mkdir -p "/data/httpboot/${version}/EFI/BOOT/"
             
-            # Copy official grub.cfg from the installer-net tar (if available)
-            if [ -f "${TEMP_DIR}/EFI/BOOT/grub.cfg" ]; then
-                echo "Copying official GRUB config for ${version}..."
-                mkdir -p "/data/httpboot/${version}/EFI/BOOT"
-                cp "${TEMP_DIR}/EFI/BOOT/grub.cfg" "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
-                chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
-                chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
-                echo "✓ Official grub.cfg copied"
-            else
-                echo "Warning: Official grub.cfg not found in archive"
-            fi
-
             # Handle EFI-related files first
             if [ -f "${TEMP_DIR}/EFI/BOOT/BOOTX64.EFI" ]; then
                 echo "Copying EFI boot files..."
                 cp -r "${TEMP_DIR}/EFI" "/data/httpboot/${version}/"
+                
+                # Copy official grub.cfg AFTER EFI directory copy to avoid overwrite
+                if [ -f "${TEMP_DIR}/EFI/BOOT/grub.cfg" ]; then
+                    echo "Copying official GRUB config for ${version} (after EFI copy)..."
+                    cp "${TEMP_DIR}/EFI/BOOT/grub.cfg" "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
+                    chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
+                    chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
+                    echo "✓ Official grub.cfg copied and secured"
+                else
+                    echo "Warning: Official grub.cfg not found in archive"
+                fi
             elif [ -f "${TEMP_DIR}/installer.iso" ]; then
                 echo "Found installer.iso, extracting EFI files..."
                 ISO_EXTRACT_DIR="${TEMP_DIR}/iso"
