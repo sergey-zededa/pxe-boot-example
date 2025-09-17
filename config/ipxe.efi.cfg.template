@@ -1,7 +1,7 @@
 #!ipxe
 
 # Official EVE-OS PXE Netboot Configuration
-# Follows the standard EVE-OS netboot flow via GRUB and installer.iso
+# Uses direct kernel boot with official EVE-OS netboot parameters
 
 echo Loading EVE-OS {{VERSION}} installer...
 
@@ -15,6 +15,9 @@ set url http://{{SERVER_IP}}/{{VERSION}}/
 set console console=ttyS0 console=ttyS1 console=ttyS2 console=ttyAMA0 console=ttyAMA1 console=tty0
 set eve_args eve_soft_serial=${mac:hexhyp} eve_reboot_after_install getty
 
+# Official EVE-OS installer arguments (from EVE source)
+set installer_args root=/initrd.image find_boot=netboot overlaytmpfs fastboot
+
 # Vendor-specific tweaks (from official ipxe.efi.cfg) 
 iseq ${smbios/manufacturer} Huawei && set console console=ttyAMA0,115200n8 ||
 iseq ${smbios/manufacturer} Huawei && set platform_tweaks pcie_aspm=off pci=pcie_bus_perf ||
@@ -26,11 +29,29 @@ echo Platform: ${platform}
 echo Manufacturer: ${smbios/manufacturer}
 echo Server: {{SERVER_IP}}
 echo Version: {{VERSION}}
+echo
+echo Boot Parameters:
+echo   Console: ${console}
+echo   EVE Args: ${eve_args}
+echo   Installer Args: ${installer_args}
+echo   Platform Tweaks: ${platform_tweaks}
 
-echo Chaining to EVE-OS GRUB bootloader...
-iseq ${buildarch} x86_64 && chain ${url}EFI/BOOT/BOOTX64.EFI ||
-iseq ${buildarch} arm64 && chain ${url}EFI/BOOT/BOOTAA64.EFI ||
-iseq ${buildarch} riscv64 && chain ${url}EFI/BOOT/BOOTRISCV64.EFI ||
+echo
+echo Booting x86_64 EVE-OS installer directly...
+kernel ${url}kernel ${console} ${eve_args} ${installer_args} ${platform_tweaks} || goto load_error
+
+echo Loading microcode...
+initrd ${url}ucode.img || echo Microcode not available, continuing...
+
+echo Loading initial ramdisk...
+initrd ${url}initrd.img || goto load_error
+
+echo Loading EVE-OS installer rootfs...
+initrd ${url}rootfs_installer.img || goto load_error
+
+echo
+echo Starting EVE-OS {{VERSION}} installer...
+boot || goto boot_error
 
 :arch_error
 echo Error: Unsupported architecture ${buildarch}
