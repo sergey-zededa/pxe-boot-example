@@ -599,25 +599,22 @@ setup_eve_versions() {
             # Set up directory structure
             mkdir -p "/data/httpboot/${version}/EFI/BOOT/"
             
-            # Generate custom grub.cfg that can find installer.iso via HTTP
-            echo "Generating custom GRUB config for ${version}..."
-            GRUB_VARS=$(printf '%s\n' \
-                "SERVER_IP=${SERVER_IP}" \
-                "VERSION=${version}")
-            
-            process_template \
-                "/config/grub.cfg.template" \
-                "/data/httpboot/${version}/EFI/BOOT/grub.cfg" \
-                "$GRUB_VARS"
-            
-            chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
-            chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
+            # Copy official grub.cfg from the installer-net tar (if available)
+            if [ -f "${TEMP_DIR}/EFI/BOOT/grub.cfg" ]; then
+                echo "Copying official GRUB config for ${version}..."
+                mkdir -p "/data/httpboot/${version}/EFI/BOOT"
+                cp "${TEMP_DIR}/EFI/BOOT/grub.cfg" "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
+                chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
+                chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
+                echo "✓ Official grub.cfg copied"
+            else
+                echo "Warning: Official grub.cfg not found in archive"
+            fi
 
             # Handle EFI-related files first
             if [ -f "${TEMP_DIR}/EFI/BOOT/BOOTX64.EFI" ]; then
                 echo "Copying EFI boot files..."
                 cp -r "${TEMP_DIR}/EFI" "/data/httpboot/${version}/"
-                chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
             elif [ -f "${TEMP_DIR}/installer.iso" ]; then
                 echo "Found installer.iso, extracting EFI files..."
                 ISO_EXTRACT_DIR="${TEMP_DIR}/iso"
@@ -626,7 +623,6 @@ setup_eve_versions() {
                     if [ -f "${ISO_EXTRACT_DIR}/EFI/BOOT/BOOTX64.EFI" ]; then
                         echo "Copying EFI files from ISO..."
                         cp -r "${ISO_EXTRACT_DIR}/EFI" "/data/httpboot/${version}/"
-                        chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
                     else
                         echo "Warning: No EFI/BOOT/BOOTX64.EFI found in ISO"
                     fi
