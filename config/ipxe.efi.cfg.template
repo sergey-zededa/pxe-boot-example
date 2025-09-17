@@ -1,99 +1,41 @@
 #!ipxe
 
-# Direct-boot EVE-OS without GRUB (avoids dropping to GRUB CLI)
-# This template is fetched as http://{{SERVER_IP}}/{{VERSION}}/ipxe.efi.cfg
+# EVE-OS Standard Boot Flow (matches official installer)
+# Chain to GRUB which handles ISO mounting and complex boot logic
 
-# Always use our server, ignore DHCP next-server
-set next-server {{SERVER_IP}}
+# Basic network setup (matches official ipxe.efi.cfg)
+# dhcp   # Commented in official version
 
-# Bring up networking (retry if necessary)
-:retry_net
-echo Initializing network stack...
-dhcp || goto retry_net_error
-
-# Verify network configuration
-# Note: Some builds do not include the 'console' command; avoid using it to prevent script errors
-# console --picture off
-set debug net,http,script,img
-
-echo iPXE boot starting...
-echo Network Status:
-echo IP: ${net0/ip}
-echo Netmask: ${net0/netmask}
-echo Gateway: ${net0/gateway}
-echo DNS: ${net0/dns}
-echo Server: ${next-server}
-
-# Base URL for versioned assets (trailing slash for simple concatenation)
-set url http://{{SERVER_IP}}/{{VERSION}}/
-
-# Detect architecture and platform (for console tweaks only)
-echo Architecture: ${buildarch}
-echo Platform: ${platform}
-echo Manufacturer: ${smbios/manufacturer}
-
-# Set boot parameters
-set console console=ttyS0,115200n8 console=tty0
+# Standard EVE-OS console setup (from official ipxe.efi.cfg)
+set console console=ttyS0 console=ttyS1 console=ttyS2 console=ttyAMA0 console=ttyAMA1 console=tty0
 set eve_args eve_soft_serial=${mac:hexhyp} eve_reboot_after_install getty
 set installer_args root=/initrd.image find_boot=netboot overlaytmpfs fastboot
 
-# Vendor/platform-specific console tweaks
+# Standard vendor-specific tweaks (from official ipxe.efi.cfg) 
 iseq ${smbios/manufacturer} Huawei && set console console=ttyAMA0,115200n8 ||
 iseq ${smbios/manufacturer} Huawei && set platform_tweaks pcie_aspm=off pci=pcie_bus_perf ||
 iseq ${smbios/manufacturer} Supermicro && set console console=ttyS1,115200n8 ||
 iseq ${smbios/manufacturer} QEMU && set console console=hvc0 console=ttyS0 ||
 
-# Only x86_64 is supported by the downloaded artifact (amd64.kvm.generic.installer-net.tar)
-iseq ${buildarch} x86_64 || goto arch_error
+# Set the base URL for this version
+set url http://{{SERVER_IP}}/{{VERSION}}/
 
-# Load kernel and initrd images directly from HTTP
-# Matches the working configuration (no GRUB)
-echo Booting x86_64 EVE-OS installer directly...
-# Fetch and load images explicitly to get detailed error messages
-kernel ${url}kernel ${console} ${eve_args} ${installer_args} ${platform_tweaks} || goto load_error
-imgstat
-
-# Load microcode (optional - continue if missing)
-echo Loading microcode...
-initrd ${url}ucode.img || echo Microcode not available, continuing...
-imgstat
-
-echo Loading initrd...
-initrd ${url}initrd.img || goto load_error
-imgstat
-
-# Load EVE-OS installer image (optional - many EVE distributions work without it)
-echo Loading EVE-OS installer image...
-initrd ${url}rootfs_installer.img || echo EVE-OS installer image not available, continuing...
-imgstat
-
-# Boot the loaded kernel
-boot || goto load_error
-
-:retry_net_error
-echo Network initialization failed
-echo Error: ${errno}
-echo Message: ${errstr}
-echo Retrying in 3 seconds...
-sleep 3
-goto retry_net
+# Chain to GRUB (standard EVE-OS flow) - GRUB handles ISO loop mounting
+echo Chaining to EVE-OS GRUB bootloader...
+iseq ${buildarch} x86_64 && chain ${url}EFI/BOOT/BOOTX64.EFI ||
+iseq ${buildarch} arm64 && chain ${url}EFI/BOOT/BOOTAA64.EFI ||
+iseq ${buildarch} riscv64 && chain ${url}EFI/BOOT/BOOTRISCV64.EFI ||
+goto arch_error
 
 :arch_error
 echo Error: Unsupported architecture ${buildarch}
-echo Supported: x86_64
+echo Supported architectures: x86_64, arm64, riscv64
 prompt Press any key to retry...
-goto retry_net
+goto start
 
-:load_error
-echo Boot failed while loading components!
-echo Error: ${errno}
-echo Message: ${errstr}
-echo Required URLs:
-echo   ${url}kernel
-echo   ${url}initrd.img
-echo
-echo Optional URLs (loaded if available):
-echo   ${url}ucode.img
-echo   ${url}rootfs_installer.img
-prompt Press any key to retry...
+:start
+echo Retrying from start...
+goto arch_error
+
+boot
 goto retry_net
