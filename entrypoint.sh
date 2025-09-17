@@ -879,7 +879,17 @@ fi
     IFS=$OLD_IFS
     
     if [ -n "$DEFAULT_VERSION" ]; then
-        echo "Creating root-level HTTP-based grub.cfg using default version: $DEFAULT_VERSION"
+        echo "Creating root-level HTTPBoot setup using default version: $DEFAULT_VERSION"
+        
+        # Copy BOOTX64.EFI to root level for HTTPBoot
+        if [ -f "/data/httpboot/${DEFAULT_VERSION}/EFI/BOOT/BOOTX64.EFI" ]; then
+            echo "Copying BOOTX64.EFI to root level for HTTPBoot..."
+            cp "/data/httpboot/${DEFAULT_VERSION}/EFI/BOOT/BOOTX64.EFI" "/data/httpboot/EFI/BOOT/BOOTX64.EFI"
+            chmod 644 "/data/httpboot/EFI/BOOT/BOOTX64.EFI"
+            chown www-data:www-data "/data/httpboot/EFI/BOOT/BOOTX64.EFI"
+        fi
+        
+        # Create HTTP-based grub.cfg for HTTPBoot
         sed -e "s/{{VERSION}}/${DEFAULT_VERSION}/g" -e "s/{{SERVER_IP}}/${SERVER_IP}/g" \
             "/config/grub_commands.cfg.template" > "/data/httpboot/EFI/BOOT/grub.cfg"
         chmod 644 "/data/httpboot/EFI/BOOT/grub.cfg"
@@ -894,9 +904,9 @@ fi
         echo "# Terminal support" > "/data/httpboot/EFI/BOOT/x86_64-efi/terminal.lst"
         chown -R www-data:www-data "/data/httpboot/EFI/BOOT/"
         
-        echo "✓ Root-level GRUB configuration created for TFTP access (default: $DEFAULT_VERSION)"
+        echo "✓ Root-level HTTPBoot setup created (default: $DEFAULT_VERSION)"
     else
-        echo "Error: No versions available to create root-level GRUB config"
+        echo "Error: No versions available to create root-level HTTPBoot setup"
     fi
 }
 
