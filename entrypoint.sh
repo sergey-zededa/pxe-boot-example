@@ -739,21 +739,8 @@ fi
         # Ensure required assets exist even for cached versions
         ensure_version_assets "${version}"
         
-        # Generate/update custom grub.cfg for cached versions too
-        echo "Ensuring custom GRUB config for cached version ${version}..."
-        mkdir -p "/data/httpboot/${version}/EFI/BOOT/"
-        
-        GRUB_VARS=$(printf '%s\n' \
-            "SERVER_IP=${SERVER_IP}" \
-            "VERSION=${version}")
-        
-        process_template \
-            "/config/grub.cfg.template" \
-            "/data/httpboot/${version}/EFI/BOOT/grub.cfg" \
-            "$GRUB_VARS"
-        
-        chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
-        chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
+        # Let GRUB use its default/embedded configuration
+        echo "Using default GRUB configuration for version ${version}..."
 
         # Set up first version as default
         if [ -z "$DEFAULT_VERSION" ]; then
