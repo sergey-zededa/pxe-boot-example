@@ -32,11 +32,12 @@ tag-if=set:ipxe-ok,tag:ipxe-http,tag:ipxe-menu,tag:ipxe-efi
 # Force TFTP server - CRITICAL for GRUB to use correct server
 dhcp-option=option:tftp-server,{{SERVER_IP}}
 
-# Server options - Force our server for all PXE-related options
-# Option 66: TFTP server (used by GRUB for cmddevice)
-dhcp-option=66,{{SERVER_IP}}
-# Avoid packing boot filename into vendor options
-dhcp-no-override
+# CRITICAL: Force our server IP for ALL network boot operations
+# This is the key - the dhcp-boot third parameter sets 'next-server'
+dhcp-option=66,{{SERVER_IP}}    # TFTP server name
+dhcp-option=150,{{SERVER_IP}}   # TFTP server list
+# Claim to be authoritative for PXE (more aggressive proxy DHCP)
+dhcp-authoritative
 
 # Boot configuration for non-iPXE clients (serve chainload binaries)
 # BIOS clients get undionly.kpxe
@@ -49,6 +50,7 @@ dhcp-boot=tag:!ipxe-ok,tag:efi64,snponly.efi,,{{SERVER_IP}}
 dhcp-boot=tag:!ipxe-ok,tag:efibc,snponly.efi,,{{SERVER_IP}}
 
 # Boot configuration for iPXE clients with required features (HTTP chain)
+# CRITICAL: Use colleague's approach - third param forces next-server override
 dhcp-boot=tag:ipxe-ok,http://{{SERVER_IP}}/boot.ipxe,,{{SERVER_IP}}
 
 # PXE service announcements for non-iPXE clients (per-arch)
