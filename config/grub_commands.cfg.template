@@ -1,0 +1,31 @@
+# GRUB Command Script for EVE-OS HTTP Boot
+# This file contains GRUB commands that can be executed directly
+
+echo "EVE-OS {{VERSION}} - HTTP Boot Sequence Starting"
+echo "Mounting installer.iso via HTTP..."
+
+# Enable HTTP module if not loaded
+insmod http
+
+# Try to mount the installer ISO via HTTP
+loopback loop0 (http,{{SERVER_IP}})/{{VERSION}}/installer.iso
+
+if [ "$?" = "0" ]; then
+    echo "Successfully mounted installer.iso"
+    set root=loop0
+    set isnetboot=true
+    export isnetboot
+    
+    # Load the EVE configuration from inside the ISO
+    configfile ($root)/EFI/BOOT/grub.cfg
+else
+    echo "Failed to mount installer.iso via HTTP"
+    echo "URL: (http,{{SERVER_IP}})/{{VERSION}}/installer.iso"
+    echo ""
+    echo "Manual commands to try:"
+    echo "  insmod http"
+    echo "  ls (http,{{SERVER_IP}})/{{VERSION}}/"
+    echo "  loopback loop0 (http,{{SERVER_IP}})/{{VERSION}}/installer.iso"
+    echo "  set root=loop0"
+    echo "  configfile (\$root)/EFI/BOOT/grub.cfg"
+fi
