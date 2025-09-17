@@ -37,21 +37,8 @@ echo   Installer Args: ${installer_args}
 echo   Platform Tweaks: ${platform_tweaks}
 
 echo
-echo Booting x86_64 EVE-OS installer directly...
-kernel ${url}kernel ${console} ${eve_args} ${installer_args} ${platform_tweaks} || goto load_error
-
-echo Loading microcode...
-initrd ${url}ucode.img || goto load_error
-
-echo Loading initial ramdisk...
-initrd ${url}initrd.img || goto load_error
-
-echo Loading EVE-OS installer image...
-initrd ${url}rootfs_installer.img || goto load_error
-
-echo
-echo Starting EVE-OS {{VERSION}} installer...
-boot || goto boot_error
+echo Chainloading to EVE-OS GRUB bootloader...
+chain ${url}EFI/BOOT/BOOTX64.EFI || goto boot_error
 
 :arch_error
 echo Error: Unsupported architecture ${buildarch}
