@@ -30,13 +30,16 @@ dhcp-no-override
 # Syntax: dhcp-boot=<filename>,<servername>,<server-ip>
 dhcp-boot=tag:!ipxe,tag:!efi64,undionly.kpxe,,{{SERVER_IP}}
 
-# Boot configuration for UEFI clients - serve EVE-OS bootloader directly
-# Skip iPXE and use EVE-OS GRUB bootloader for direct EVE-OS netboot
-dhcp-boot=tag:efi64,BOOTX64.EFI,,{{SERVER_IP}}
+# Boot configuration for UEFI clients (smaller NBP to avoid PXE-E05)
+# Provide filename and siaddr explicitly
+dhcp-boot=tag:!ipxe,tag:efi64,snponly.efi,,{{SERVER_IP}}
 
-# PXE service announcements for EVE-OS direct boot
+# Boot configuration for iPXE clients (HTTP chain)
+dhcp-boot=tag:ipxe,http://{{SERVER_IP}}/boot.ipxe
+
+# PXE service announcements (required for some PXE ROMs in proxy mode)
 # Use architecture constants supported by dnsmasq
-pxe-service=X86-64_EFI,"EVE-OS Network Boot",BOOTX64.EFI,{{SERVER_IP}}
+pxe-service=X86-64_EFI,"PXE UEFI x86-64 (iPXE)",snponly.efi,{{SERVER_IP}}
 pxe-service=X86PC,"PXE BIOS (iPXE)",undionly.kpxe,{{SERVER_IP}}
 
 # Optional domain name configuration
