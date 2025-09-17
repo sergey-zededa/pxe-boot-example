@@ -4,9 +4,9 @@ interface={{LISTEN_INTERFACE}}
 bind-interfaces
 log-dhcp
 
-# TFTP configuration
+# TFTP configuration - Point to HTTP directory to eliminate duplication
 enable-tftp
-tftp-root=/tftpboot
+tftp-root=/data/httpboot
 
 # Client detection - Architecture specific
 dhcp-match=set:efi32,option:client-arch,6   # EFI IA32
@@ -29,13 +29,9 @@ tag-if=set:ipxe-ok,tag:ipxe-http,tag:ipxe-menu,tag:ipxe-efi
 # DHCP Configuration (mode-specific) - CRITICAL for proxy mode
 {{DHCP_CONFIG}}
 
-# Force TFTP server - CRITICAL for GRUB to use correct server
-dhcp-option=option:tftp-server,{{SERVER_IP}}
-
-# CRITICAL: Force our server IP for ALL network boot operations
-# This is the key - the dhcp-boot third parameter sets 'next-server'
-dhcp-option=66,{{SERVER_IP}}    # TFTP server name
-dhcp-option=150,{{SERVER_IP}}   # TFTP server list
+# CRITICAL: Force our server IP but avoid TFTP-specific options
+# Let GRUB choose its own protocol (should prefer HTTP if available)
+# Only the dhcp-boot third parameter sets 'next-server' for basic connectivity
 # Claim to be authoritative for PXE (more aggressive proxy DHCP)
 dhcp-authoritative
 
