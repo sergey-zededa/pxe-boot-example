@@ -15,9 +15,9 @@ set url http://{{SERVER_IP}}/{{VERSION}}/
 set console console=ttyS0 console=ttyS1 console=ttyS2 console=ttyAMA0 console=ttyAMA1 console=tty0
 set eve_args eve_soft_serial=${mac:hexhyp} eve_reboot_after_install getty
 
-# CORRECTED installer_args - use HTTP URL for rootfs context
-# This tells EVE installer to expect network boot with HTTP-accessible rootfs
-set installer_args root=/initrd.image find_boot=netboot overlaytmpfs fastboot eve_install_server=http://{{SERVER_IP}}/{{VERSION}}
+# EVE-OS installer arguments for proper netboot context
+# Use installer.iso as root with netboot flag for proper EVE environment
+set installer_args root=live:http://{{SERVER_IP}}/{{VERSION}}/installer.iso rd.live.image quiet rd.shell find_boot=netboot overlaytmpfs eve_install_server=http://{{SERVER_IP}}/{{VERSION}}
 
 # Vendor-specific tweaks (from official ipxe.efi.cfg) 
 iseq ${smbios/manufacturer} Huawei && set console console=ttyAMA0,115200n8 ||
