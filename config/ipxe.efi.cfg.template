@@ -9,7 +9,8 @@ set url http://{{SERVER_IP}}/{{VERSION}}/
 # Standard EVE-OS console setup (from official ipxe.efi.cfg)
 set console console=ttyS0 console=ttyS1 console=ttyS2 console=ttyAMA0 console=ttyAMA1 console=tty0
 set eve_args eve_soft_serial=${mac:hexhyp} eve_reboot_after_install getty
-set installer_args root=/initrd.image rootimg=/rootfs_installer.img find_boot=netboot overlaytmpfs fastboot
+# Pass URL so initramfs can fetch artifacts over HTTP in netboot mode
+set installer_args root=/initrd.image find_boot=netboot overlaytmpfs fastboot url=${url}
 
 # Vendor-specific tweaks (from official ipxe.efi.cfg) 
 iseq ${smbios/manufacturer} Huawei && set console console=ttyAMA0,115200n8 ||
@@ -25,13 +26,9 @@ imgfree
 # Load kernel with command line
 kernel ${url}kernel ${console} ${eve_args} ${installer_args} || goto chain_grub
 
-# Load required initramfs as the main initrd (must be last plain initrd)
+# Load microcode first (optional), then the main initramfs
+initrd ${url}ucode.img || echo "ucode.img missing, continuing"
 initrd ${url}initrd.img || goto chain_grub
-
-# Load additional payloads into initramfs with explicit names
-initrd --name rootfs_installer.img ${url}rootfs_installer.img || goto chain_grub
-# Microcode is optional; if present, it will be available to userspace; kernel may still boot without it
-initrd --name ucode.img ${url}ucode.img || echo "ucode.img missing, continuing"
 
 # Boot the kernel
 boot || goto chain_grub
