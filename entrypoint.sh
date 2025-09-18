@@ -1119,6 +1119,9 @@ EOF
 
     chmod 644 /data/httpboot/boot.ipxe
     chown www-data:www-data /data/httpboot/boot.ipxe
+
+    # Inject SERVER_IP into the stub (preserve iPXE variables)
+    sed -i "s|{{SERVER_IP}}|${SERVER_IP}|g" /data/httpboot/boot.ipxe
 }
 
 # Generate iPXE boot menu
