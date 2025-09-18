@@ -18,7 +18,7 @@ iseq ${smbios/manufacturer} Supermicro && set console console=ttyS1,115200n8 ||
 iseq ${smbios/manufacturer} QEMU && set console console=hvc0 console=ttyS0 ||
 
 # Architecture-specific chainloading with explicit GRUB config handoff
-# We fetch the GRUB EFI binary and pass a per-version grub.cfg URL via EFI load options
+# Use URL fragment to pass per-version grub.cfg to GRUB (more widely honored)
 iseq ${buildarch} x86_64 && goto uefi64 ||
 iseq ${buildarch} arm64 && goto uefi64 ||
 iseq ${buildarch} riscv64 && goto uefi64 ||
@@ -29,11 +29,8 @@ goto arch_error
 set grubefi ${url}EFI/BOOT/BOOTX64.EFI
 set grubcfg ${url}EFI/BOOT/grub_pre.cfg
 
-echo Loading GRUB EFI from ${grubefi}
-imgfree
-imgfetch --name grubx64.efi ${grubefi} || goto load_error
-imgargs grubx64.efi "grub.cfg=${grubcfg}"
-boot grubx64.efi || goto boot_error
+echo Chaining GRUB with explicit config: ${grubcfg}
+chain --replace ${grubefi}#grub.cfg=${grubcfg} || goto load_error
 
 :arch_error
 echo Error: Unsupported architecture ${buildarch}
