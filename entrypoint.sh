@@ -1120,8 +1120,6 @@ EOF
     chmod 644 /data/httpboot/boot.ipxe
     chown www-data:www-data /data/httpboot/boot.ipxe
 }
-    echo "Boot menu generated successfully"
-}
 
 # Generate iPXE boot menu
 generate_boot_menu
@@ -1168,22 +1166,28 @@ check_file() {
 }
 
 check_file "/data/httpboot/boot.ipxe"
-check_file "/data/httpboot/latest/ipxe.efi"
-check_file "/data/httpboot/latest/ipxe.efi.cfg"
-check_file "/data/httpboot/latest/EFI/BOOT/BOOTX64.EFI"
 
-# Verify boot.ipxe content
+# Ensure we have at least one GRUB path available
+if [ -f "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI" ]; then
+    echo "✓ HTTP GRUB image present"
+else
+    echo "HTTP GRUB image not found; verifying TFTP fallback..."
+    if [ ! -f "/tftpboot/EFI/BOOT/BOOTX64.EFI" ] || [ ! -f "/tftpboot/EFI/BOOT/grub.cfg" ]; then
+        echo "ERROR: Neither HTTP GRUB nor TFTP GRUB fallback is available"
+        exit 1
+    fi
+fi
+
+# Verify boot.ipxe content (minimal stub)
 echo "Verifying boot.ipxe content..."
-if ! grep -q "chain --replace --autofree" /data/httpboot/boot.ipxe || \
-   ! grep -q "menu EVE-OS Boot Menu" /data/httpboot/boot.ipxe || \
-   ! grep -q "#!ipxe" /data/httpboot/boot.ipxe; then
-    echo "ERROR: boot.ipxe appears to be invalid"
-    echo "Missing one or more required elements:"
-    echo "  - #!ipxe header"
-    echo "  - menu EVE-OS Boot Menu"
-    echo "  - chain --replace --autofree command"
-    echo ""
-    echo "Current content:"
+if ! grep -q "^#!ipxe" /data/httpboot/boot.ipxe; then
+    echo "ERROR: boot.ipxe missing #!ipxe header"
+    cat /data/httpboot/boot.ipxe
+    exit 1
+fi
+if ! grep -q "imgfetch --name grubx64_http\.efi" /data/httpboot/boot.ipxe && \
+   ! grep -q "chain tftp://" /data/httpboot/boot.ipxe; then
+    echo "ERROR: boot.ipxe missing expected GRUB boot commands"
     cat /data/httpboot/boot.ipxe
     exit 1
 fi
