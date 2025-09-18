@@ -860,6 +860,46 @@ fi
         chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub_pre.cfg"
         chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub_pre.cfg"
 
+        # Build a standalone GRUB EFI with embedded HTTP prelude to avoid PXE next-server in proxy mode
+        if command -v grub-mkstandalone >/dev/null 2>&1; then
+            echo "Building embedded GRUB HTTP EFI for ${version}..."
+            EMBED_CFG="/tmp/grub-embedded-${version}.cfg"
+            cat > "$EMBED_CFG" <<EOF
+insmod http
+insmod test
+set url=http://${SERVER_IP}/${version}/
+export url
+set isnetboot=true
+export isnetboot
+unset pxe_default_server
+unset net_default_server
+set cmddevice=http,${SERVER_IP}
+set cmdpath=(http,${SERVER_IP})/${version}/
+export cmddevice
+export cmdpath
+if configfile (http,${SERVER_IP})/${version}/EFI/BOOT/grub.cfg; then
+    true
+elif configfile (http,${SERVER_IP})/${version}/EFI/BOOT/grub_include.cfg; then
+    true
+else
+    echo 'ERROR: HTTP GRUB config not found'
+    sleep 5
+fi
+EOF
+            grub-mkstandalone -O x86_64-efi \
+                -o "/data/httpboot/${version}/EFI/BOOT/GRUBX64_HTTP.EFI" \
+                --modules="http efinet normal linux linuxefi tftp configfile search search_label search_fs_uuid test" \
+                "boot/grub/grub.cfg=$EMBED_CFG" >/dev/null 2>&1 || echo "Warning: grub-mkstandalone failed; continuing without embedded GRUB"
+            rm -f "$EMBED_CFG" || true
+            if [ -f "/data/httpboot/${version}/EFI/BOOT/GRUBX64_HTTP.EFI" ]; then
+                chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/GRUBX64_HTTP.EFI"
+                chmod 644 "/data/httpboot/${version}/EFI/BOOT/GRUBX64_HTTP.EFI"
+                echo "✓ Built GRUBX64_HTTP.EFI for ${version}"
+            fi
+        else
+            echo "Warning: grub-mkstandalone not available; skipping embedded GRUB build for ${version}"
+        fi
+
     done
     IFS=$OLD_IFS
 

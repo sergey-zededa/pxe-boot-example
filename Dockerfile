@@ -11,7 +11,8 @@ RUN apk add --no-cache \
     bash \
     p7zip \
     rsync \
-    tcpdump
+    tcpdump \
+    grub-efi
 
 # 2. Create users and groups
 RUN adduser -S -u 82 -D -H -h /var/www -s /sbin/nologin -G www-data -g www-data www-data

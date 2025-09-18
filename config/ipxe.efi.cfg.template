@@ -18,8 +18,9 @@ iseq ${smbios/manufacturer} Huawei && set platform_tweaks pcie_aspm=off pci=pcie
 iseq ${smbios/manufacturer} Supermicro && set console console=ttyS1,115200n8 ||
 iseq ${smbios/manufacturer} QEMU && set console console=hvc0 console=ttyS0 ||
 
-# Hand off to TFTP GRUB bootstrap menu (multi-version selection in GRUB)
-echo Handing off to GRUB via TFTP...
+# Prefer HTTP-embedded GRUB with embedded HTTP prelude to avoid PXE next-server issues in proxy mode
+iseq ${buildarch} x86_64 && chain ${url}EFI/BOOT/GRUBX64_HTTP.EFI ||
+chain ${url}EFI/BOOT/BOOTX64.EFI ||
 chain tftp://{{SERVER_IP}}/EFI/BOOT/BOOTX64.EFI || goto boot_error
 boot
 
