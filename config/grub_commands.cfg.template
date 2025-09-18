@@ -11,6 +11,12 @@ insmod http
 set url=http://{{SERVER_IP}}/{{VERSION}}/
 export url
 
+# Force GRUB command device/path to HTTP to avoid TFTP fallbacks
+set cmddevice=http,{{SERVER_IP}}
+set cmdpath=(http,{{SERVER_IP}})/{{VERSION}}/
+export cmddevice
+export cmdpath
+
 # Avoid PXE-derived fallbacks
 unset pxe_default_server
 unset net_default_server
