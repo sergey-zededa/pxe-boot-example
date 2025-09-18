@@ -17,20 +17,27 @@ iseq ${smbios/manufacturer} Huawei && set platform_tweaks pcie_aspm=off pci=pcie
 iseq ${smbios/manufacturer} Supermicro && set console console=ttyS1,115200n8 ||
 iseq ${smbios/manufacturer} QEMU && set console console=hvc0 console=ttyS0 ||
 
-# Architecture-specific chainloading with explicit GRUB config handoff
-# Use URL fragment to pass per-version grub.cfg to GRUB (more widely honored)
-iseq ${buildarch} x86_64 && goto uefi64 ||
-iseq ${buildarch} arm64 && goto uefi64 ||
-iseq ${buildarch} riscv64 && goto uefi64 ||
+# Try direct Linux boot first (HTTP-only)
+echo Attempting direct Linux boot via iPXE...
+# Clear any previously loaded images
+imgfree
 
-goto arch_error
+# Load kernel with command line
+kernel ${url}kernel ${console} ${eve_args} ${installer_args} || goto chain_grub
 
-:uefi64
-set grubefi ${url}EFI/BOOT/BOOTX64.EFI
-set grubcfg ${url}EFI/BOOT/grub_pre.cfg
+# Load optional microcode, then required initrd components
+initrd ${url}ucode.img || echo "ucode.img missing, continuing"
+initrd ${url}initrd.img || goto chain_grub
+initrd ${url}rootfs_installer.img || goto chain_grub
 
-echo Chaining GRUB with explicit config: ${grubcfg}
-chain --replace ${grubefi}#grub.cfg=${grubcfg} || goto load_error
+# Boot the kernel
+boot || goto chain_grub
+
+# Fallback: chain to GRUB (may rely on platform GRUB behavior)
+:chain_grub
+echo Falling back to GRUB EFI...
+chain ${url}EFI/BOOT/BOOTX64.EFI || goto boot_error
+boot
 
 :arch_error
 echo Error: Unsupported architecture ${buildarch}
