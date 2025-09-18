@@ -50,8 +50,8 @@ dhcp-boot=tag:!ipxe-ok,tag:efibc,snponly.efi,,{{SERVER_IP}}
 dhcp-boot=tag:ipxe-ok,http://{{SERVER_IP}}/boot.ipxe,,0.0.0.1
 
 # UEFI HTTPBoot configuration for GRUB (architecture 16)
-# Set vendor class to HTTPClient and provide HTTP bootfile
-dhcp-option=tag:efi64-httpboot,option:vendor-class,HTTPClient
+# Set vendor class to HTTPClient (DHCP option 60) and provide HTTP bootfile
+dhcp-option=tag:efi64-httpboot,60,HTTPClient
 dhcp-boot=tag:efi64-httpboot,http://{{SERVER_IP}}/EFI/BOOT/BOOTX64.EFI
 
 # PXE service announcements for non-iPXE clients (per-arch)
