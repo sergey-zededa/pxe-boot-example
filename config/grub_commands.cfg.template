@@ -2,39 +2,22 @@
 # This file contains GRUB commands that can be executed directly
 
 echo "EVE-OS {{VERSION}} - HTTP Boot Sequence Starting"
-echo "Mounting installer.iso via HTTP..."
+echo "Loading official EVE netboot grub.cfg via HTTP..."
 
 # Enable HTTP module if not loaded
 insmod http
 
-# Try to mount the installer ISO via HTTP
-loopback loop0 (http,{{SERVER_IP}})/{{VERSION}}/installer.iso
+# Provide canonical base URL for EVE configs that rely on ${url}
+set url=http://{{SERVER_IP}}/{{VERSION}}/
+export url
 
-if [ "$?" = "0" ]; then
-    echo "Successfully mounted installer.iso"
-    set root=loop0
-    # Ensure GRUB resolves assets relative to the HTTP-mounted ISO
-    set prefix=($root)/EFI/BOOT
-    export prefix
-    
-    # Hint EVE config to prefer HTTP by providing a canonical URL
-    set url http://{{SERVER_IP}}/{{VERSION}}/
-    export url
-    
-    # Signal netboot mode explicitly
-    set isnetboot=true
-    export isnetboot
-    
-    # Load the EVE configuration from inside the ISO (now using HTTP-rooted prefix)
-    configfile ($prefix)/grub.cfg
-else
-    echo "Failed to mount installer.iso via HTTP"
-    echo "URL: (http,{{SERVER_IP}})/{{VERSION}}/installer.iso"
-    echo ""
-    echo "Manual commands to try:"
-    echo "  insmod http"
-    echo "  ls (http,{{SERVER_IP}})/{{VERSION}}/"
-    echo "  loopback loop0 (http,{{SERVER_IP}})/{{VERSION}}/installer.iso"
-    echo "  set root=loop0"
-    echo "  configfile (\$root)/EFI/BOOT/grub.cfg"
-fi
+# Load the official netboot GRUB configuration over HTTP
+configfile (http,{{SERVER_IP}})/{{VERSION}}/EFI/BOOT/grub.cfg
+
+# If we ever get here, configfile failed
+echo "Failed to load netboot grub.cfg via HTTP"
+echo "URL: (http,{{SERVER_IP}})/{{VERSION}}/EFI/BOOT/grub.cfg"
+echo "Try manually:"
+echo "  insmod http"
+echo "  set url=http://{{SERVER_IP}}/{{VERSION}}/"
+echo "  configfile (http,{{SERVER_IP}})/{{VERSION}}/EFI/BOOT/grub.cfg"
