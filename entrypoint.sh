@@ -854,41 +854,6 @@ fi
 
     done
     IFS=$OLD_IFS
-# Create root-level GRUB configuration for TFTP access (bootstrap)
-# Serve a tiny HTTP-switching grub.cfg via TFTP so GRUB flips to HTTP immediately
-printf "\nCreating TFTP bootstrap GRUB configuration...\n"
-mkdir -p "/tftpboot/EFI/BOOT"
- 
-# Determine default version (first in list)
-OLD_IFS=$IFS
-IFS=','
-DEFAULT_VERSION=""
-for version in $EVE_VERSIONS; do
-    if [ -z "$DEFAULT_VERSION" ]; then
-        DEFAULT_VERSION=$version
-        break
-    fi
-
-done
-IFS=$OLD_IFS
- 
-    if [ -n "$DEFAULT_VERSION" ]; then
-        echo "Default version for GRUB bootstrap: $DEFAULT_VERSION"
-        sed -e "s/{{VERSION}}/${DEFAULT_VERSION}/g" -e "s/{{SERVER_IP}}/${SERVER_IP}/g" \
-        "/config/grub_commands.cfg.template" > "/tftpboot/EFI/BOOT/grub.cfg"
-        chmod 644 "/tftpboot/EFI/BOOT/grub.cfg"
-        chown dnsmasq:dnsmasq "/tftpboot/EFI/BOOT/grub.cfg"
-        echo "✓ TFTP bootstrap GRUB config generated"
-        
-        # Expose installer.iso at HTTP root so official config can find ($cmddevice)/installer.iso
-        if [ -f "/data/httpboot/${DEFAULT_VERSION}/installer.iso" ]; then
-            ln -sf "/data/httpboot/${DEFAULT_VERSION}/installer.iso" "/data/httpboot/installer.iso"
-            chown -h www-data:www-data "/data/httpboot/installer.iso" || true
-            echo "✓ Linked /data/httpboot/installer.iso to default version ISO"
-        fi
-else
-    echo "Error: No versions available to create TFTP bootstrap grub.cfg"
-fi
 }
 
 # Function to set file permissions
