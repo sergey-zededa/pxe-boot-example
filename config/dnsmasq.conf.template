@@ -62,7 +62,7 @@ pxe-service=tag:!ipxe-ok,tag:!efi64-httpboot,BC_EFI,"PXE EFI BC",snponly.efi,{{S
 pxe-service=tag:!ipxe-ok,tag:!efi64-httpboot,X86-64_EFI,"PXE EFI64",snponly.efi,{{SERVER_IP}}
 
 # HTTPBoot service announcement for UEFI firmware with architecture 16
-pxe-service=tag:efi64-httpboot,"HTTPBoot","HTTP UEFI x86-64",http://{{SERVER_IP}}/EFI/BOOT/BOOTX64.EFI
+# Note: HTTP URLs in pxe-service not supported, using dhcp-boot above instead
 
 # Additional PXE options handled by dhcp-boot and pxe-service above
 
