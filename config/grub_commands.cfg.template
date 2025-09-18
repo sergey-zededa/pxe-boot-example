@@ -34,17 +34,17 @@ if [ "$?" = "0" ]; then
 
     # Direct netboot from ISO contents (do NOT rely on ISO's grub.cfg)
     echo "Booting EVE-OS from ISO over HTTP (netboot args)"
-    linux ($root)/boot/kernel console=ttyS0 console=hvc0 root=/initrd.image find_boot=netboot overlaytmpfs fastboot rootdelay=3
+    linuxefi ($root)/boot/kernel console=ttyS0 console=hvc0 root=/initrd.image find_boot=netboot overlaytmpfs fastboot rootdelay=3
     # Microcode and initrd chain
     if [ -f ($root)/boot/ucode.img ]; then
-        initrd ($root)/boot/ucode.img
+        initrdefi ($root)/boot/ucode.img
     fi
-    initrd ($root)/boot/initrd.img
+    initrdefi ($root)/boot/initrd.img
     if [ -f ($root)/rootfs_installer.img ]; then
-        initrd ($root)/rootfs_installer.img
+        initrdefi ($root)/rootfs_installer.img
     fi
     if [ -f ($root)/config.img ]; then
-        initrd ($root)/config.img
+        initrdefi ($root)/config.img
     fi
     boot
 else
@@ -52,16 +52,16 @@ else
     echo "URL: (http,{{SERVER_IP}})/{{VERSION}}/installer.iso"
 
     # Direct HTTP netboot from version root (no ISO)
-    linux (http,{{SERVER_IP}})/{{VERSION}}/kernel console=ttyS0 console=hvc0 root=/initrd.image find_boot=netboot overlaytmpfs fastboot rootdelay=3
+    linuxefi (http,{{SERVER_IP}})/{{VERSION}}/kernel console=ttyS0 console=hvc0 root=/initrd.image find_boot=netboot overlaytmpfs fastboot rootdelay=3
     if [ -f (http,{{SERVER_IP}})/{{VERSION}}/ucode.img ]; then
-        initrd (http,{{SERVER_IP}})/{{VERSION}}/ucode.img
+        initrdefi (http,{{SERVER_IP}})/{{VERSION}}/ucode.img
     fi
-    initrd (http,{{SERVER_IP}})/{{VERSION}}/initrd.img
+    initrdefi (http,{{SERVER_IP}})/{{VERSION}}/initrd.img
     if [ -f (http,{{SERVER_IP}})/{{VERSION}}/rootfs_installer.img ]; then
-        initrd (http,{{SERVER_IP}})/{{VERSION}}/rootfs_installer.img
+        initrdefi (http,{{SERVER_IP}})/{{VERSION}}/rootfs_installer.img
     fi
     if [ -f (http,{{SERVER_IP}})/{{VERSION}}/config.img ]; then
-        initrd (http,{{SERVER_IP}})/{{VERSION}}/config.img
+        initrdefi (http,{{SERVER_IP}})/{{VERSION}}/config.img
     fi
     boot
 fi
