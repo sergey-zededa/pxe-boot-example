@@ -963,6 +963,61 @@ EOF
     chown dnsmasq:dnsmasq "${GRUB_TFTP_CFG}"
     chmod 644 "${GRUB_TFTP_CFG}"
     echo "✓ TFTP GRUB bootstrap menu generated"
+
+    # Also build a single embedded GRUB HTTP menu covering all versions
+    if command -v grub-mkstandalone >/dev/null 2>&1; then
+        echo "Building embedded GRUB HTTP menu for all versions..."
+        mkdir -p "/data/httpboot/EFI/BOOT"
+        EMBED_ALL="/tmp/grub-embedded-all.cfg"
+        {
+            echo "insmod http"
+            echo "insmod test"
+            echo "set default=0"
+            echo "set timeout=${BOOT_MENU_TIMEOUT}"
+        } > "$EMBED_ALL"
+
+        OLD_IFS3=$IFS
+        IFS=','
+        for v in ${EVE_VERSIONS}; do
+            cat >> "$EMBED_ALL" <<EOF
+menuentry 'EVE-OS ${v}' {
+    echo 'Switching to HTTP configuration for ${v}...'
+    set url=http://${SERVER_IP}/${v}/
+    export url
+    set isnetboot=true
+    export isnetboot
+    unset pxe_default_server
+    unset net_default_server
+    set cmddevice=http,${SERVER_IP}
+    set cmdpath=(http,${SERVER_IP})/${v}/
+    export cmddevice
+    export cmdpath
+    if configfile (http,${SERVER_IP})/${v}/EFI/BOOT/grub.cfg; then
+        true
+    elif configfile (http,${SERVER_IP})/${v}/EFI/BOOT/grub_include.cfg; then
+        true
+    else
+        echo 'ERROR: HTTP GRUB config not found for ${v}'
+        sleep 5
+    fi
+}
+EOF
+        done
+        IFS=$OLD_IFS3
+
+        grub-mkstandalone -O x86_64-efi \
+            -o "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI" \
+            --modules="http efinet normal linux linuxefi tftp configfile search search_label search_fs_uuid test" \
+            "boot/grub/grub.cfg=$EMBED_ALL" >/dev/null 2>&1 || echo "Warning: grub-mkstandalone failed; continuing without embedded GRUB menu"
+        rm -f "$EMBED_ALL" || true
+        if [ -f "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI" ]; then
+            chown www-data:www-data "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI"
+            chmod 644 "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI"
+            echo "✓ Built GRUBX64_HTTP.EFI (HTTP menu across versions)"
+        fi
+    else
+        echo "Warning: grub-mkstandalone not available; skipping embedded GRUB menu build"
+    fi
 }
 
 # Function to set file permissions
@@ -1033,123 +1088,38 @@ validate_environment
 # 2. Set up EVE-OS versions and assets
 setup_eve_versions
 
-# Function to generate boot menu
+# Function to generate minimal iPXE stub (no menu)
 generate_boot_menu() {
-    echo "Generating iPXE boot menu..."
-    
-    # Create initial menu file
-    cat > /data/httpboot/boot.ipxe <<'EOF'
+    echo "Generating minimal iPXE stub..."
+
+    cat > /data/httpboot/boot.ipxe <<EOF
 #!ipxe
 
-# Enable debugging
-set debug all
-set debug dhcp,net
-
-# Configure network settings
 :retry_dhcp
 echo Configuring network...
-dhcp || goto retry_dhcp_fail
+dhcp || goto retry_dhcp
 
-echo Network configured successfully:
-echo IP: ${net0/ip}
-echo Netmask: ${net0/netmask}
-echo Gateway: ${net0/gateway}
-echo DNS: ${net0/dns}
+# Prefer embedded GRUB with HTTP prelude to avoid PXE next-server issues
+set http_grub http://${SERVER_IP}/EFI/BOOT/GRUBX64_HTTP.EFI
 
-# Main menu
-:start
-menu EVE-OS Boot Menu
-item --gap -- Available versions:
-EOF
-    
-    # Add menu items
-    item_num=1
-    OLD_IFS=$IFS
-    IFS=','
-    for version in $EVE_VERSIONS; do
-        echo "item eve_${item_num} EVE-OS ${version}" >> /data/httpboot/boot.ipxe
-        item_num=$((item_num+1))
-    done
-    IFS=$OLD_IFS
-    
-    # Add menu footer
-    cat >> /data/httpboot/boot.ipxe <<'EOF'
+echo Booting GRUB (HTTP) from: \\${http_grub}
+imgfree
+imgfetch --name grubx64_http.efi \\${http_grub} || goto grub_http_fail
+boot grubx64_http.efi || goto grub_http_fail
 
-item
-item --gap -- Tools:
-item shell Drop to iPXE shell
-item reboot Reboot system
-item retry Retry network configuration
-item
-item --gap -- --------------------------------------------
-item --gap Selected version will boot in ${BOOT_MENU_TIMEOUT} seconds
-item --gap Server IP: ${SERVER_IP}
-item --gap Client IP: ${net0/ip}
-item --gap Architecture: ${buildarch}
+:grub_http_fail
+echo GRUB HTTP failed; falling back to TFTP GRUB...
+chain tftp://${SERVER_IP}/EFI/BOOT/BOOTX64.EFI || goto fail
+boot || goto fail
 
-choose --timeout 10000 --default eve_1 selected || goto menu_error
-goto ${selected}
-
-:retry_dhcp_fail
-echo DHCP configuration failed. Retrying in 3 seconds...
-sleep 3
-goto retry_dhcp
-
-:menu_error
-echo Menu selection failed
-echo Error: ${errno}
-prompt --timeout 5000 Press any key to retry or wait 5 seconds...
-goto start
-EOF
-
-    # Add menu handlers for each version
-    item_num=1
-    OLD_IFS=$IFS
-    IFS=','
-    for version in $EVE_VERSIONS; do
-        cat >> /data/httpboot/boot.ipxe <<EOF
-
-:eve_${item_num}
-echo Loading EVE-OS ${version}...
-echo Attempting to chain load http://${SERVER_IP}/${version}/ipxe.efi.cfg
-chain --replace --autofree http://${SERVER_IP}/${version}/ipxe.efi.cfg || goto chain_error_${item_num}
-
-:chain_error_${item_num}
-echo Chain load failed for EVE-OS ${version}
-echo Error: \${errno}
-echo Common error codes:
-echo 1 - File not found
-echo 2 - Access denied
-echo 3 - Disk error
-echo 4 - Network error
-prompt --timeout 5000 Press any key to return to menu or wait 5 seconds...
-goto start
-EOF
-        item_num=$((item_num+1))
-    done
-    IFS=$OLD_IFS
-
-    # Add utility handlers
-    cat >> /data/httpboot/boot.ipxe <<'EOF'
-
-:shell
-echo Dropping to iPXE shell...
+:fail
+echo Boot failed (errno=\\${errno}). Dropping to iPXE shell.
 shell
-goto start
-
-:reboot
-echo Rebooting system...
-reboot
-
-:retry
-echo Retrying network configuration...
-goto retry_dhcp
 EOF
 
-    # Set permissions
     chmod 644 /data/httpboot/boot.ipxe
     chown www-data:www-data /data/httpboot/boot.ipxe
-    
+}
     echo "Boot menu generated successfully"
 }
 
