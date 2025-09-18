@@ -6,6 +6,8 @@ echo "Mounting installer.iso via HTTP..."
 
 # Enable HTTP module if not loaded
 insmod http
+insmod loopback
+insmod iso9660
 insmod test
 
 # Provide canonical base URL for EVE configs that rely on ${url}
@@ -30,13 +32,20 @@ if [ "$?" = "0" ]; then
     set root=loop0
     set prefix=($root)/EFI/BOOT
     export prefix
-    # Prefer ISO's GRUB config; on failure fallback to HTTP netboot config
+    # Prefer ISO's GRUB config; try common filenames
     if configfile ($prefix)/grub.cfg; then
-        # Handed off to ISO config
+        true
+    elif configfile ($prefix)/grub_include.cfg; then
         true
     else
-        echo "ISO grub.cfg not found or failed; falling back to HTTP netboot config"
-        configfile (http,{{SERVER_IP}})/{{VERSION}}/EFI/BOOT/grub.cfg
+        echo "ISO GRUB config not found; falling back to HTTP netboot config"
+        # Fallback over HTTP with explicit prefix to avoid TFTP
+        set root=(http,{{SERVER_IP}})/{{VERSION}}/
+        set prefix=(http,{{SERVER_IP}})/{{VERSION}}/EFI/BOOT
+        export prefix
+        if ! configfile ($prefix)/grub.cfg; then
+            configfile ($prefix)/grub_include.cfg
+        fi
     fi
 else
     echo "Failed to mount installer.iso via HTTP; falling back to HTTP netboot config"
