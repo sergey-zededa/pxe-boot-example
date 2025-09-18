@@ -18,25 +18,9 @@ iseq ${smbios/manufacturer} Huawei && set platform_tweaks pcie_aspm=off pci=pcie
 iseq ${smbios/manufacturer} Supermicro && set console console=ttyS1,115200n8 ||
 iseq ${smbios/manufacturer} QEMU && set console console=hvc0 console=ttyS0 ||
 
-# Try direct Linux boot first (HTTP-only)
-echo Attempting direct Linux boot via iPXE...
-# Clear any previously loaded images
-imgfree
-
-# Load kernel with command line
-kernel ${url}kernel ${console} ${eve_args} ${installer_args} || goto chain_grub
-
-# Load microcode first (optional), then the main initramfs
-initrd ${url}ucode.img || echo "ucode.img missing, continuing"
-initrd ${url}initrd.img || goto chain_grub
-
-# Boot the kernel
-boot || goto chain_grub
-
-# Fallback: chain to GRUB (may rely on platform GRUB behavior)
-:chain_grub
-echo Falling back to GRUB EFI...
-chain ${url}EFI/BOOT/BOOTX64.EFI || goto boot_error
+# Hand off to TFTP GRUB bootstrap menu (multi-version selection in GRUB)
+echo Handing off to GRUB via TFTP...
+chain tftp://{{SERVER_IP}}/EFI/BOOT/BOOTX64.EFI || goto boot_error
 boot
 
 :arch_error
