@@ -33,8 +33,13 @@ if [ "$?" = "0" ]; then
 
     # Option B: Use official EVE GRUB config with proper netboot hints
     set isnetboot=true
-    set install_part=loop0
-    # Keep URL and HTTP context from above
+    export isnetboot
+    # Make sure install_part resolves to ISO device by aligning cmddevice/cmdpath
+    set cmddevice=loop0
+    set cmdpath=(loop0)/
+    export cmddevice
+    export cmdpath
+    # Keep URL from above
     # Hand off to the official config inside the ISO
     if configfile ($root)/EFI/BOOT/grub.cfg; then
         true
