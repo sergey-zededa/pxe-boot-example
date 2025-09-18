@@ -8,7 +8,6 @@ echo "Mounting installer.iso via HTTP..."
 insmod http
 insmod loopback
 insmod iso9660
-insmod linux
 insmod test
 
 # Provide canonical base URL (used by some EVE configs)
@@ -32,36 +31,26 @@ if [ "$?" = "0" ]; then
     echo "Successfully mounted installer.iso"
     set root=loop0
 
-    # Direct netboot from ISO contents (do NOT rely on ISO's grub.cfg)
-    echo "Booting EVE-OS from ISO over HTTP (netboot args)"
-    linuxefi ($root)/boot/kernel console=ttyS0 console=hvc0 root=/initrd.image find_boot=netboot overlaytmpfs fastboot rootdelay=3
-    # Microcode and initrd chain
-    if [ -f ($root)/boot/ucode.img ]; then
-        initrdefi ($root)/boot/ucode.img
+    # Option B: Use official EVE GRUB config with proper netboot hints
+    set isnetboot=true
+    set install_part=loop0
+    # Keep URL and HTTP context from above
+    # Hand off to the official config inside the ISO
+    if configfile ($root)/EFI/BOOT/grub.cfg; then
+        true
+    elif configfile ($root)/EFI/BOOT/grub_include.cfg; then
+        true
+    else
+        echo "ISO GRUB config not found; falling back to pure HTTP netboot config"
+        if ! configfile (http,{{SERVER_IP}})/{{VERSION}}/EFI/BOOT/grub.cfg; then
+            configfile (http,{{SERVER_IP}})/{{VERSION}}/EFI/BOOT/grub_include.cfg
+        fi
     fi
-    initrdefi ($root)/boot/initrd.img
-    if [ -f ($root)/rootfs_installer.img ]; then
-        initrdefi ($root)/rootfs_installer.img
-    fi
-    if [ -f ($root)/config.img ]; then
-        initrdefi ($root)/config.img
-    fi
-    boot
 else
     echo "Failed to mount installer.iso via HTTP; falling back to pure HTTP netboot"
     echo "URL: (http,{{SERVER_IP}})/{{VERSION}}/installer.iso"
-
-    # Direct HTTP netboot from version root (no ISO)
-    linuxefi (http,{{SERVER_IP}})/{{VERSION}}/kernel console=ttyS0 console=hvc0 root=/initrd.image find_boot=netboot overlaytmpfs fastboot rootdelay=3
-    if [ -f (http,{{SERVER_IP}})/{{VERSION}}/ucode.img ]; then
-        initrdefi (http,{{SERVER_IP}})/{{VERSION}}/ucode.img
+    # Use EVE's official netboot config over HTTP
+    if ! configfile (http,{{SERVER_IP}})/{{VERSION}}/EFI/BOOT/grub.cfg; then
+        configfile (http,{{SERVER_IP}})/{{VERSION}}/EFI/BOOT/grub_include.cfg
     fi
-    initrdefi (http,{{SERVER_IP}})/{{VERSION}}/initrd.img
-    if [ -f (http,{{SERVER_IP}})/{{VERSION}}/rootfs_installer.img ]; then
-        initrdefi (http,{{SERVER_IP}})/{{VERSION}}/rootfs_installer.img
-    fi
-    if [ -f (http,{{SERVER_IP}})/{{VERSION}}/config.img ]; then
-        initrdefi (http,{{SERVER_IP}})/{{VERSION}}/config.img
-    fi
-    boot
 fi
