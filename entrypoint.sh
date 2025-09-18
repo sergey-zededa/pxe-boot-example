@@ -611,18 +611,12 @@ setup_eve_versions() {
                 echo "Copying EFI boot files..."
                 cp -r "${TEMP_DIR}/EFI" "/data/httpboot/${version}/"
                 
-                # EMERGENCY: Copy grub.cfg to TFTP directory since GRUB uses TFTP
+                # Keep official grub.cfg only under HTTP version path; do NOT copy into TFTP
                 if [ -f "${TEMP_DIR}/EFI/BOOT/grub.cfg" ]; then
-                    echo "Copying official GRUB config for ${version} to HTTP location..."
+                    echo "Copying official GRUB config for ${version} to HTTP location only..."
                     cp "${TEMP_DIR}/EFI/BOOT/grub.cfg" "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
                     chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
                     chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub.cfg"
-                    
-                    echo "Also copying grub.cfg to TFTP directory..."
-                    mkdir -p "/tftpboot/EFI/BOOT"
-                    cp "${TEMP_DIR}/EFI/BOOT/grub.cfg" "/tftpboot/EFI/BOOT/grub.cfg"
-                    chmod 644 "/tftpboot/EFI/BOOT/grub.cfg"
-                    chown dnsmasq:dnsmasq "/tftpboot/EFI/BOOT/grub.cfg"
                 else
                     echo "Warning: Official grub.cfg not found in archive"
                 fi
@@ -860,54 +854,34 @@ fi
 
     done
     IFS=$OLD_IFS
-    
-    # Create root-level GRUB configuration for TFTP access
-    # GRUB looks for /EFI/BOOT/grub.cfg at TFTP root, not in version subdirectories
-    echo "\nCreating root-level GRUB configuration for TFTP access..."
-    mkdir -p "/data/httpboot/EFI/BOOT"
-    
-    # Use the first version as default for the root-level grub.cfg
-    OLD_IFS=$IFS
-    IFS=','
-    DEFAULT_VERSION=""
-    for version in $EVE_VERSIONS; do
-        if [ -z "$DEFAULT_VERSION" ]; then
-            DEFAULT_VERSION=$version
-            break
-        fi
-    done
-    IFS=$OLD_IFS
-    
-    if [ -n "$DEFAULT_VERSION" ]; then
-        echo "Creating root-level HTTPBoot setup using default version: $DEFAULT_VERSION"
-        
-        # Copy BOOTX64.EFI to root level for HTTPBoot
-        if [ -f "/data/httpboot/${DEFAULT_VERSION}/EFI/BOOT/BOOTX64.EFI" ]; then
-            echo "Copying BOOTX64.EFI to root level for HTTPBoot..."
-            cp "/data/httpboot/${DEFAULT_VERSION}/EFI/BOOT/BOOTX64.EFI" "/data/httpboot/EFI/BOOT/BOOTX64.EFI"
-            chmod 644 "/data/httpboot/EFI/BOOT/BOOTX64.EFI"
-            chown www-data:www-data "/data/httpboot/EFI/BOOT/BOOTX64.EFI"
-        fi
-        
-        # Create HTTP-based grub.cfg for HTTPBoot
-        sed -e "s/{{VERSION}}/${DEFAULT_VERSION}/g" -e "s/{{SERVER_IP}}/${SERVER_IP}/g" \
-            "/config/grub_commands.cfg.template" > "/data/httpboot/EFI/BOOT/grub.cfg"
-        chmod 644 "/data/httpboot/EFI/BOOT/grub.cfg"
-        chown www-data:www-data "/data/httpboot/EFI/BOOT/grub.cfg"
-        
-        # Create missing GRUB module lists at root level
-        echo "Creating root-level GRUB module lists..."
-        mkdir -p "/data/httpboot/EFI/BOOT/x86_64-efi"
-        echo "# HTTP module" > "/data/httpboot/EFI/BOOT/x86_64-efi/command.lst"
-        echo "# HTTP filesystem" > "/data/httpboot/EFI/BOOT/x86_64-efi/fs.lst"
-        echo "# Basic crypto" > "/data/httpboot/EFI/BOOT/x86_64-efi/crypto.lst"
-        echo "# Terminal support" > "/data/httpboot/EFI/BOOT/x86_64-efi/terminal.lst"
-        chown -R www-data:www-data "/data/httpboot/EFI/BOOT/"
-        
-        echo "✓ Root-level HTTPBoot setup created (default: $DEFAULT_VERSION)"
-    else
-        echo "Error: No versions available to create root-level HTTPBoot setup"
+# Create root-level GRUB configuration for TFTP access (bootstrap)
+# Serve a tiny HTTP-switching grub.cfg via TFTP so GRUB flips to HTTP immediately
+printf "\nCreating TFTP bootstrap GRUB configuration...\n"
+mkdir -p "/tftpboot/EFI/BOOT"
+ 
+# Determine default version (first in list)
+OLD_IFS=$IFS
+IFS=','
+DEFAULT_VERSION=""
+for version in $EVE_VERSIONS; do
+    if [ -z "$DEFAULT_VERSION" ]; then
+        DEFAULT_VERSION=$version
+        break
     fi
+
+done
+IFS=$OLD_IFS
+ 
+if [ -n "$DEFAULT_VERSION" ]; then
+    echo "Default version for GRUB bootstrap: $DEFAULT_VERSION"
+    sed -e "s/{{VERSION}}/${DEFAULT_VERSION}/g" -e "s/{{SERVER_IP}}/${SERVER_IP}/g" \
+        "/config/grub_commands.cfg.template" > "/tftpboot/EFI/BOOT/grub.cfg"
+    chmod 644 "/tftpboot/EFI/BOOT/grub.cfg"
+    chown dnsmasq:dnsmasq "/tftpboot/EFI/BOOT/grub.cfg"
+    echo "✓ TFTP bootstrap GRUB config generated"
+else
+    echo "Error: No versions available to create TFTP bootstrap grub.cfg"
+fi
 }
 
 # Function to set file permissions
