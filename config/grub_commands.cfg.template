@@ -2,12 +2,9 @@
 # This file contains GRUB commands that can be executed directly
 
 echo "EVE-OS {{VERSION}} - HTTP Boot Sequence Starting"
-echo "Mounting installer.iso via HTTP..."
 
 # Enable necessary modules
 insmod http
-insmod loopback
-insmod iso9660
 insmod test
 
 # Provide canonical base URL (used by some EVE configs)
@@ -20,42 +17,23 @@ set cmdpath=(http,{{SERVER_IP}})/{{VERSION}}/
 export cmddevice
 export cmdpath
 
-# Avoid PXE-derived fallbacks
+# Mark as netboot and avoid PXE-derived fallbacks
+set isnetboot=true
+export isnetboot
 unset pxe_default_server
 unset net_default_server
 
-# Try to mount the installer ISO via HTTP
-loopback loop0 (http,{{SERVER_IP}})/{{VERSION}}/installer.iso
-
-if [ "$?" = "0" ]; then
-    echo "Successfully mounted installer.iso"
-    set root=loop0
-
-    # Option B: Use official EVE GRUB config with proper netboot hints
-    set isnetboot=true
-    export isnetboot
-    # Make sure install_part resolves to ISO device by aligning cmddevice/cmdpath
-    set cmddevice=loop0
-    set cmdpath=(loop0)/
-    export cmddevice
-    export cmdpath
-    # Keep URL from above
-    # Hand off to the official config inside the ISO
-    if configfile ($root)/EFI/BOOT/grub.cfg; then
-        true
-    elif configfile ($root)/EFI/BOOT/grub_include.cfg; then
-        true
-    else
-        echo "ISO GRUB config not found; falling back to pure HTTP netboot config"
-        if ! configfile (http,{{SERVER_IP}})/{{VERSION}}/EFI/BOOT/grub.cfg; then
-            configfile (http,{{SERVER_IP}})/{{VERSION}}/EFI/BOOT/grub_include.cfg
-        fi
-    fi
+# Hand off to official EVE GRUB config over HTTP (never use ISO config here)
+if configfile (http,{{SERVER_IP}})/{{VERSION}}/EFI/BOOT/grub.cfg; then
+    true
+elif configfile (http,{{SERVER_IP}})/{{VERSION}}/EFI/BOOT/grub_include.cfg; then
+    true
 else
-    echo "Failed to mount installer.iso via HTTP; falling back to pure HTTP netboot"
-    echo "URL: (http,{{SERVER_IP}})/{{VERSION}}/installer.iso"
-    # Use EVE's official netboot config over HTTP
-    if ! configfile (http,{{SERVER_IP}})/{{VERSION}}/EFI/BOOT/grub.cfg; then
-        configfile (http,{{SERVER_IP}})/{{VERSION}}/EFI/BOOT/grub_include.cfg
-    fi
+    echo "ERROR: Could not load official HTTP GRUB configuration"
+    echo "Tried:"
+    echo "  http://{{SERVER_IP}}/{{VERSION}}/EFI/BOOT/grub.cfg"
+    echo "  http://{{SERVER_IP}}/{{VERSION}}/EFI/BOOT/grub_include.cfg"
+    # As a last resort, show what HTTP can see
+    ls (http,{{SERVER_IP}})/{{VERSION}}/
+    sleep 5
 fi
