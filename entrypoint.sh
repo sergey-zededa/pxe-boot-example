@@ -1092,7 +1092,7 @@ setup_eve_versions
 generate_boot_menu() {
     echo "Generating minimal iPXE stub..."
 
-    cat > /data/httpboot/boot.ipxe <<EOF
+    cat > /data/httpboot/boot.ipxe <<'EOF'
 #!ipxe
 
 :retry_dhcp
@@ -1100,20 +1100,20 @@ echo Configuring network...
 dhcp || goto retry_dhcp
 
 # Prefer embedded GRUB with HTTP prelude to avoid PXE next-server issues
-set http_grub http://${SERVER_IP}/EFI/BOOT/GRUBX64_HTTP.EFI
+set http_grub http://{{SERVER_IP}}/EFI/BOOT/GRUBX64_HTTP.EFI
 
-echo Booting GRUB (HTTP) from: \\${http_grub}
+echo Booting GRUB (HTTP) from: ${http_grub}
 imgfree
-imgfetch --name grubx64_http.efi \\${http_grub} || goto grub_http_fail
+imgfetch --name grubx64_http.efi ${http_grub} || goto grub_http_fail
 boot grubx64_http.efi || goto grub_http_fail
 
 :grub_http_fail
 echo GRUB HTTP failed; falling back to TFTP GRUB...
-chain tftp://${SERVER_IP}/EFI/BOOT/BOOTX64.EFI || goto fail
+chain tftp://{{SERVER_IP}}/EFI/BOOT/BOOTX64.EFI || goto fail
 boot || goto fail
 
 :fail
-echo Boot failed (errno=\\${errno}). Dropping to iPXE shell.
+echo Boot failed (errno=${errno}). Dropping to iPXE shell.
 shell
 EOF
 

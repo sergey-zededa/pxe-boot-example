@@ -12,6 +12,7 @@ RUN apk add --no-cache \
     p7zip \
     rsync \
     tcpdump \
+    grub \
     grub-efi
 
 # 2. Create users and groups
