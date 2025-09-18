@@ -17,12 +17,23 @@ iseq ${smbios/manufacturer} Huawei && set platform_tweaks pcie_aspm=off pci=pcie
 iseq ${smbios/manufacturer} Supermicro && set console console=ttyS1,115200n8 ||
 iseq ${smbios/manufacturer} QEMU && set console console=hvc0 console=ttyS0 ||
 
-# Architecture-specific chainloading (from official EVE-OS config)
-iseq ${buildarch} x86_64 && chain ${url}EFI/BOOT/BOOTX64.EFI ||
-iseq ${buildarch} arm64 && chain ${url}EFI/BOOT/BOOTAA64.EFI ||
-iseq ${buildarch} riscv64 && chain ${url}EFI/BOOT/BOOTRISCV64.EFI ||
+# Architecture-specific chainloading with explicit GRUB config handoff
+# We fetch the GRUB EFI binary and pass a per-version grub.cfg URL via EFI load options
+iseq ${buildarch} x86_64 && goto uefi64 ||
+iseq ${buildarch} arm64 && goto uefi64 ||
+iseq ${buildarch} riscv64 && goto uefi64 ||
 
-boot
+goto arch_error
+
+:uefi64
+set grubefi ${url}EFI/BOOT/BOOTX64.EFI
+set grubcfg ${url}EFI/BOOT/grub_pre.cfg
+
+echo Loading GRUB EFI from ${grubefi}
+imgfree
+imgfetch --name grubx64.efi ${grubefi} || goto load_error
+imgargs grubx64.efi "grub.cfg=${grubcfg}"
+boot grubx64.efi || goto boot_error
 
 :arch_error
 echo Error: Unsupported architecture ${buildarch}

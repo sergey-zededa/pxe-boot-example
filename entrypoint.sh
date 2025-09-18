@@ -849,8 +849,16 @@ fi
             echo "URL successfully injected for version ${version}"
         else
             echo "WARNING: Boot URL variable injection may have failed"
-            echo "Expected one of: 'set url http://${SERVER_IP}/${version}/' or 'set url http://\${next-server}/${version}/'"
+            echo "Expected: 'set url http://${SERVER_IP}/${version}/'"
         fi
+
+        # Generate per-version GRUB HTTP prelude that sets env and chains into official config
+        echo "Generating GRUB HTTP prelude for version ${version}..."
+        mkdir -p "/data/httpboot/${version}/EFI/BOOT"
+        sed -e "s/{{VERSION}}/${version}/g" -e "s/{{SERVER_IP}}/${SERVER_IP}/g" \
+            "/config/grub_commands.cfg.template" > "/data/httpboot/${version}/EFI/BOOT/grub_pre.cfg"
+        chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub_pre.cfg"
+        chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub_pre.cfg"
 
     done
     IFS=$OLD_IFS
