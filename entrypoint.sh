@@ -951,7 +951,6 @@ EOF
             --modules="http efinet normal linux linuxefi tftp configfile search search_label search_fs_uuid test" \
             "boot/grub/grub.cfg=$EMBED_TFTP" >/dev/null 2>&1; then
 chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} "/tftpboot/EFI/BOOT/BOOTX64.EFI"
-"
             chmod 644 "/tftpboot/EFI/BOOT/BOOTX64.EFI"
             echo "✓ Embedded TFTP GRUB built successfully"
         else
@@ -960,7 +959,7 @@ chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} "/tftpboot/EFI/BOOT/BOOTX64.EFI"
             if [ -f "/data/httpboot/${DEFAULT_VERSION}/EFI/BOOT/BOOTX64.EFI" ]; then
                 echo "Copying GRUB EFI from ${DEFAULT_VERSION} to TFTP (fallback)..."
                 cp "/data/httpboot/${DEFAULT_VERSION}/EFI/BOOT/BOOTX64.EFI" "/tftpboot/EFI/BOOT/BOOTX64.EFI"
-                chown dnsmasq:dnsmasq "/tftpboot/EFI/BOOT/BOOTX64.EFI"
+chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} "/tftpboot/EFI/BOOT/BOOTX64.EFI"
                 chmod 644 "/tftpboot/EFI/BOOT/BOOTX64.EFI"
             else
                 echo "WARNING: BOOTX64.EFI not found under ${DEFAULT_VERSION}; GRUB handoff may fail"
@@ -972,7 +971,7 @@ chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} "/tftpboot/EFI/BOOT/BOOTX64.EFI"
         if [ -f "/data/httpboot/${DEFAULT_VERSION}/EFI/BOOT/BOOTX64.EFI" ]; then
             echo "Copying GRUB EFI from ${DEFAULT_VERSION} to TFTP..."
             cp "/data/httpboot/${DEFAULT_VERSION}/EFI/BOOT/BOOTX64.EFI" "/tftpboot/EFI/BOOT/BOOTX64.EFI"
-            chown dnsmasq:dnsmasq "/tftpboot/EFI/BOOT/BOOTX64.EFI"
+chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} "/tftpboot/EFI/BOOT/BOOTX64.EFI"
             chmod 644 "/tftpboot/EFI/BOOT/BOOTX64.EFI"
         else
             echo "WARNING: BOOTX64.EFI not found under ${DEFAULT_VERSION}; GRUB handoff may fail"
