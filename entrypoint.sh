@@ -181,19 +181,23 @@ validate_environment() {
     DHCP_MODE=${DHCP_MODE:="proxy"}
     DHCP_SUBNET_MASK=${DHCP_SUBNET_MASK:="255.255.255.0"}
 
-    # Validate interface and IP configuration
-    if ! ip addr show "$LISTEN_INTERFACE" &>/dev/null; then
+    # Validate interface and IP configuration (more robust)
+    if [ ! -d "/sys/class/net/${LISTEN_INTERFACE}" ]; then
         echo "Error: Interface $LISTEN_INTERFACE not found"
         has_error=1
-    elif ! ip addr show "$LISTEN_INTERFACE" | grep -q "$SERVER_IP"; then
-        echo "Error: IP $SERVER_IP not configured on $LISTEN_INTERFACE"
-        has_error=1
+    else
+        # Do not hard-fail if the container's view doesn't have the host IP; warn instead
+        if ! ip -o addr show dev "$LISTEN_INTERFACE" 2>/dev/null | grep -q "$SERVER_IP"; then
+            echo "Warning: IP $SERVER_IP not observed on $LISTEN_INTERFACE inside container"
+        fi
     fi
 
-    # Check HTTP port availability
-    if netstat -ln | grep -q ':80.*LISTEN'; then
-        echo "Error: Port 80 is already in use"
-        has_error=1
+    # Check HTTP port availability using ss (netstat may be unavailable)
+    if command -v ss >/dev/null 2>&1; then
+        if ss -ltn | grep -q ":80"; then
+            echo "Error: Port 80 is already in use"
+            has_error=1
+        fi
     fi
 
     # Validate DHCP mode-specific configuration
