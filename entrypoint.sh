@@ -910,17 +910,79 @@ EOF
     # Determine default version (first in list)
     DEFAULT_VERSION=$(echo "${EVE_VERSIONS}" | awk -F',' '{print $1}')
 
-    # Copy GRUB EFI binary from default version into TFTP (for initial GRUB load)
-    if [ -f "/data/httpboot/${DEFAULT_VERSION}/EFI/BOOT/BOOTX64.EFI" ]; then
-        echo "Copying GRUB EFI from ${DEFAULT_VERSION} to TFTP..."
-        cp "/data/httpboot/${DEFAULT_VERSION}/EFI/BOOT/BOOTX64.EFI" "/tftpboot/EFI/BOOT/BOOTX64.EFI"
-        chown dnsmasq:dnsmasq "/tftpboot/EFI/BOOT/BOOTX64.EFI"
-        chmod 644 "/tftpboot/EFI/BOOT/BOOTX64.EFI"
+    # Build an embedded TFTP GRUB image with HTTP menu across versions
+    if command -v grub-mkstandalone >/dev/null 2>&1; then
+        echo "Building embedded TFTP GRUB (BOOTX64.EFI) with HTTP menu..."
+        EMBED_TFTP="/tmp/grub-embedded-tftp.cfg"
+        {
+            echo "insmod http"
+            echo "insmod test"
+            echo "set default=0"
+            echo "set timeout=${BOOT_MENU_TIMEOUT}"
+        } > "$EMBED_TFTP"
+
+        OLD_IFS2=$IFS
+        IFS=','
+        for v in ${EVE_VERSIONS}; do
+            cat >> "$EMBED_TFTP" <<EOF
+menuentry 'EVE-OS ${v}' {
+    echo 'Switching to HTTP configuration for ${v}...'
+    set url=http://${SERVER_IP}/${v}/
+    export url
+    set isnetboot=true
+    export isnetboot
+    unset pxe_default_server
+    unset net_default_server
+    set cmddevice=http,${SERVER_IP}
+    set cmdpath=(http,${SERVER_IP})/${v}/
+    export cmddevice
+    export cmdpath
+    if configfile (http,${SERVER_IP})/${v}/EFI/BOOT/grub.cfg; then
+        true
+    elif configfile (http,${SERVER_IP})/${v}/EFI/BOOT/grub_include.cfg; then
+        true
     else
-        echo "WARNING: BOOTX64.EFI not found under ${DEFAULT_VERSION}; GRUB handoff may fail"
+        echo 'ERROR: HTTP GRUB config not found for ${v}'
+        sleep 5
+    fi
+}
+EOF
+        done
+        IFS=$OLD_IFS2
+
+        if grub-mkstandalone -O x86_64-efi \
+            -o "/tftpboot/EFI/BOOT/BOOTX64.EFI" \
+            --modules="http efinet normal linux linuxefi tftp configfile search search_label search_fs_uuid test" \
+            "boot/grub/grub.cfg=$EMBED_TFTP" >/dev/null 2>&1; then
+            chown dnsmasq:dnsmasq "/tftpboot/EFI/BOOT/BOOTX64.EFI"
+            chmod 644 "/tftpboot/EFI/BOOT/BOOTX64.EFI"
+            echo "✓ Embedded TFTP GRUB built successfully"
+        else
+            echo "Warning: grub-mkstandalone failed for TFTP GRUB; falling back to vendor BOOTX64.EFI + TFTP grub.cfg"
+            # Fallback to copying vendor BOOTX64.EFI
+            if [ -f "/data/httpboot/${DEFAULT_VERSION}/EFI/BOOT/BOOTX64.EFI" ]; then
+                echo "Copying GRUB EFI from ${DEFAULT_VERSION} to TFTP (fallback)..."
+                cp "/data/httpboot/${DEFAULT_VERSION}/EFI/BOOT/BOOTX64.EFI" "/tftpboot/EFI/BOOT/BOOTX64.EFI"
+                chown dnsmasq:dnsmasq "/tftpboot/EFI/BOOT/BOOTX64.EFI"
+                chmod 644 "/tftpboot/EFI/BOOT/BOOTX64.EFI"
+            else
+                echo "WARNING: BOOTX64.EFI not found under ${DEFAULT_VERSION}; GRUB handoff may fail"
+            fi
+        fi
+        rm -f "$EMBED_TFTP" || true
+    else
+        echo "Warning: grub-mkstandalone not available; copying vendor BOOTX64.EFI and generating TFTP grub.cfg"
+        if [ -f "/data/httpboot/${DEFAULT_VERSION}/EFI/BOOT/BOOTX64.EFI" ]; then
+            echo "Copying GRUB EFI from ${DEFAULT_VERSION} to TFTP..."
+            cp "/data/httpboot/${DEFAULT_VERSION}/EFI/BOOT/BOOTX64.EFI" "/tftpboot/EFI/BOOT/BOOTX64.EFI"
+            chown dnsmasq:dnsmasq "/tftpboot/EFI/BOOT/BOOTX64.EFI"
+            chmod 644 "/tftpboot/EFI/BOOT/BOOTX64.EFI"
+        else
+            echo "WARNING: BOOTX64.EFI not found under ${DEFAULT_VERSION}; GRUB handoff may fail"
+        fi
     fi
 
-    # Build GRUB menu with HTTP handoff per version
+    # Always generate a TFTP grub.cfg as a backup (used if vendor BOOTX64.EFI searches for it)
     GRUB_TFTP_CFG="/tftpboot/EFI/BOOT/grub.cfg"
     echo "Generating ${GRUB_TFTP_CFG}..."
     {
