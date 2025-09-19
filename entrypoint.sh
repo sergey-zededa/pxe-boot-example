@@ -1258,8 +1258,8 @@ generate_boot_menu() {
 echo Configuring network...
 dhcp || goto retry_dhcp
 
-# Prefer HTTP for the first-stage vendor GRUB; fallback to TFTP if HTTP fails
-chain http://{{SERVER_IP}}/EFI/BOOT/BOOTX64.EFI || chain tftp://{{SERVER_IP}}/EFI/BOOT/BOOTX64.EFI || goto fail
+# Prefer HTTP for our GRUB delegate first; then vendor; then TFTP
+chain http://{{SERVER_IP}}/EFI/BOOT/GRUBX64_HTTP.EFI || chain http://{{SERVER_IP}}/EFI/BOOT/BOOTX64.EFI || chain tftp://{{SERVER_IP}}/EFI/BOOT/BOOTX64.EFI || goto fail
 boot || goto fail
 
 :fail
@@ -1303,6 +1303,7 @@ setup_global_http_grub() {
     {
         echo "set default=0"
         echo "set timeout=${BOOT_MENU_TIMEOUT}"
+        echo "set timeout_style=menu"
         echo "insmod http"
         echo "insmod configfile"
         echo "insmod loopback"
@@ -1310,6 +1311,7 @@ setup_global_http_grub() {
         echo "insmod test"
         echo "insmod linux"
         echo "insmod gzio"
+        echo "insmod normal"
     } > "${GLOBAL_GRUB_CFG}"
 
     OLD_IFS4=$IFS
@@ -1335,9 +1337,53 @@ EOF
     done
     IFS=$OLD_IFS4
 
+    # Ensure the menu is displayed even if this config is loaded from GRUB shell
+    echo "normal" >> "${GLOBAL_GRUB_CFG}"
+
     chown www-data:www-data "${GLOBAL_GRUB_CFG}"
     chmod 644 "${GLOBAL_GRUB_CFG}"
     echo "✓ Global HTTP vendor GRUB configured"
+
+    # Attempt to build a tiny GRUB delegate that always loads the global HTTP grub.cfg
+    # This avoids reliance on firmware next-server and ensures menu display in proxy mode
+    if command -v grub-mkstandalone >/dev/null 2>&1; then
+        echo "Building HTTP GRUB delegate (GRUBX64_HTTP.EFI)..."
+        EMBED_DELEGATE="/tmp/grub-embedded-delegate.cfg"
+        cat > "$EMBED_DELEGATE" <<EOF
+insmod http
+insmod configfile
+insmod normal
+set timeout=1
+set timeout_style=menu
+configfile (http,${SERVER_IP})/EFI/BOOT/grub.cfg
+normal
+EOF
+        GRUB_LOG="/data/grub-build.log"
+        if [ "$LOG_LEVEL" = "debug" ]; then
+            grub-mkstandalone -v -O x86_64-efi \
+                -d /usr/lib/grub/x86_64-efi \
+                -o "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI" \
+                --modules="http efinet normal configfile test loopback iso9660 linux gzio" \
+                "boot/grub/grub.cfg=$EMBED_DELEGATE" 2>"$GRUB_LOG" || true
+        else
+            grub-mkstandalone -O x86_64-efi \
+                -d /usr/lib/grub/x86_64-efi \
+                -o "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI" \
+                --modules="http efinet normal configfile test loopback iso9660 linux gzio" \
+                "boot/grub/grub.cfg=$EMBED_DELEGATE" >/dev/null 2>&1 || true
+        fi
+        rm -f "$EMBED_DELEGATE" || true
+
+        if [ -s "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI" ]; then
+            chown www-data:www-data "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI"
+            chmod 644 "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI"
+            echo "✓ HTTP GRUB delegate built successfully"
+        else
+            echo "WARNING: Failed to build GRUBX64_HTTP.EFI; check ${GRUB_LOG:-grub build log} if LOG_LEVEL=debug"
+        fi
+    else
+        echo "WARNING: grub-mkstandalone not available; skipping GRUBX64_HTTP.EFI build"
+    fi
 }
 
 setup_global_http_grub
@@ -1388,11 +1434,11 @@ check_file "/data/httpboot/boot.ipxe"
 
 # Ensure we have at least one GRUB path available
 if [ -f "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI" ]; then
-    echo "✓ HTTP GRUB image present (embedded)"
+    echo "✓ HTTP GRUB delegate present (preferred)"
 elif [ -f "/data/httpboot/EFI/BOOT/BOOTX64.EFI" ] && [ -f "/data/httpboot/EFI/BOOT/grub.cfg" ]; then
     echo "✓ Global HTTP vendor GRUB present"
 else
-    echo "HTTP GRUB image not found; verifying TFTP fallback..."
+    echo "HTTP GRUB not available; verifying TFTP fallback..."
     if [ ! -f "/tftpboot/EFI/BOOT/BOOTX64.EFI" ] || [ ! -f "/tftpboot/EFI/BOOT/grub.cfg" ]; then
         echo "ERROR: Neither HTTP GRUB nor TFTP GRUB fallback is available"
         exit 1
