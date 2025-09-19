@@ -28,20 +28,22 @@ process_template() {
     echo "Creating sed script with variable substitutions"
     while IFS='=' read -r key value; do
         if [ -n "$key" ]; then
-            echo "s/{{${key}}}/${value//\//\\/}/g" >> "$temp_script"
+            # Escape characters special to sed replacement: \, /, &
+            esc_value=$(printf '%s' "$value" | sed -e 's/[\\/&]/\\&/g')
+            printf 's/{{%s}}/%s/g\n' "$key" "$esc_value" >> "$temp_script"
             echo "  - Substituting: {{${key}}} → ${value}"
         fi
     done < "$temp_vars"
 
-    # If no substitutions were added, create a no-op script
+    # Process template or copy as-is if no substitutions
     if [ ! -s "$temp_script" ]; then
         echo "No variables provided; copying template as-is"
-        echo 'p' > "$temp_script"
+        cp "$template_path" "$output_path"
+        sed_status=$?
+    else
+        sed -f "$temp_script" "$template_path" > "$output_path"
+        sed_status=$?
     fi
-
-    # Process template using the script
-    sed -f "$temp_script" "$template_path" > "$output_path"
-    local sed_status=$?
 
     # Clean up
     rm -f "$temp_script" "$temp_vars"
@@ -720,17 +722,31 @@ else
 fi
     
 # Ensure all files are readable
-find "/data/httpboot/${version}" -type f -exec sh -c 'if ! su -s /bin/sh www-data -c "test -r {}" ; then echo "Warning: {} not readable by www-data"; fi' \;
+find "/data/httpboot/${version}" -type f -exec sh -c '
+    if command -v runuser >/dev/null 2>&1; then
+        runuser -u www-data -- sh -c "test -r \"$1\""
+    else
+        su -s /bin/sh www-data -c "test -r \"$1\""
+    fi || echo "Warning: $1 not readable by www-data"
+' sh {} \;
     
 # Test nginx config
 echo "Testing nginx configuration..."
 nginx -t
     
 # Verify that nginx can access files
-if ! su -s /bin/sh www-data -c "cat /data/httpboot/${version}/ipxe.efi.cfg" > /dev/null 2>&1; then
-    echo "Warning: www-data cannot read ipxe.efi.cfg"
+if command -v runuser >/dev/null 2>&1; then
+    if ! runuser -u www-data -- test -r "/data/httpboot/${version}/ipxe.efi.cfg"; then
+        echo "Warning: www-data cannot read ipxe.efi.cfg"
+    else
+        echo "✓ www-data can read ipxe.efi.cfg"
+    fi
 else
-    echo "✓ www-data can read ipxe.efi.cfg"
+    if ! su -s /bin/sh www-data -c "test -r /data/httpboot/${version}/ipxe.efi.cfg" > /dev/null 2>&1; then
+        echo "Warning: www-data cannot read ipxe.efi.cfg"
+    else
+        echo "✓ www-data can read ipxe.efi.cfg"
+    fi
 fi
             
             # Set proper permissions for extracted files
@@ -796,11 +812,20 @@ chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} /tftpboot/ipxe.efi
                 "initrd.img"; do
                 if [ -f "/data/httpboot/latest/${file}" ]; then
                     echo "✓ ${file} is present"
-                    if su -s /bin/sh www-data -c "test -r /data/httpboot/latest/${file}"; then
-                        echo "✓ ${file} is readable by www-data"
+                    if command -v runuser >/dev/null 2>&1; then
+                        if runuser -u www-data -- test -r "/data/httpboot/latest/${file}"; then
+                            echo "✓ ${file} is readable by www-data"
+                        else
+                            echo "✗ WARNING: ${file} is not readable by www-data"
+                            VERIFY_ERRORS=$((VERIFY_ERRORS + 1))
+                        fi
                     else
-                        echo "✗ WARNING: ${file} is not readable by www-data"
-                        VERIFY_ERRORS=$((VERIFY_ERRORS + 1))
+                        if su -s /bin/sh www-data -c "test -r /data/httpboot/latest/${file}"; then
+                            echo "✓ ${file} is readable by www-data"
+                        else
+                            echo "✗ WARNING: ${file} is not readable by www-data"
+                            VERIFY_ERRORS=$((VERIFY_ERRORS + 1))
+                        fi
                     fi
                 else
                     echo "✗ WARNING: ${file} is missing"
@@ -812,10 +837,18 @@ chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} /tftpboot/ipxe.efi
             for file in "ucode.img" "rootfs_installer.img"; do
                 if [ -f "/data/httpboot/latest/${file}" ]; then
                     echo "✓ ${file} is present"
-                    if su -s /bin/sh www-data -c "test -r /data/httpboot/latest/${file}"; then
-                        echo "✓ ${file} is readable by www-data"
+                    if command -v runuser >/dev/null 2>&1; then
+                        if runuser -u www-data -- test -r "/data/httpboot/latest/${file}"; then
+                            echo "✓ ${file} is readable by www-data"
+                        else
+                            echo "✗ WARNING: ${file} is not readable by www-data"
+                        fi
                     else
-                        echo "✗ WARNING: ${file} is not readable by www-data"
+                        if su -s /bin/sh www-data -c "test -r /data/httpboot/latest/${file}"; then
+                            echo "✓ ${file} is readable by www-data"
+                        else
+                            echo "✗ WARNING: ${file} is not readable by www-data"
+                        fi
                     fi
                 else
                     echo "✗ WARNING: ${file} is missing"
@@ -893,7 +926,7 @@ EOF
             if grub-mkstandalone -O x86_64-efi \
                 -d /usr/lib/grub/x86_64-efi \
                 -o "/data/httpboot/${version}/EFI/BOOT/GRUBX64_HTTP.EFI" \
-                --modules="http efinet normal linux linuxefi tftp configfile search search_label search_fs_uuid test" \
+                --modules="http efinet normal tftp configfile search search_label search_fs_uuid test" \
                 "boot/grub/grub.cfg=$EMBED_CFG" >/dev/null 2>&1; then
                 if [ -s "/data/httpboot/${version}/EFI/BOOT/GRUBX64_HTTP.EFI" ]; then
                     chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/GRUBX64_HTTP.EFI"
@@ -948,7 +981,7 @@ EOF
 
         if grub-mkstandalone -O x86_64-efi \
             -o "/tftpboot/EFI/BOOT/BOOTX64.EFI" \
-            --modules="http efinet normal linux linuxefi tftp configfile search search_label search_fs_uuid test" \
+            --modules="http efinet normal tftp configfile search search_label search_fs_uuid test chain" \
             "boot/grub/grub.cfg=$EMBED_TFTP" >/dev/null 2>&1; then
 chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} "/tftpboot/EFI/BOOT/BOOTX64.EFI"
             chmod 644 "/tftpboot/EFI/BOOT/BOOTX64.EFI"
@@ -1051,7 +1084,7 @@ EOF
         if grub-mkstandalone -O x86_64-efi \
             -d /usr/lib/grub/x86_64-efi \
             -o "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI" \
-            --modules="http efinet normal linux linuxefi tftp configfile search search_label search_fs_uuid test" \
+            --modules="http efinet normal tftp configfile search search_label search_fs_uuid test" \
             "boot/grub/grub.cfg=$EMBED_ALL" >/dev/null 2>&1; then
             if [ -s "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI" ]; then
                 chown www-data:www-data "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI"
