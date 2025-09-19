@@ -886,16 +886,23 @@ else
     sleep 5
 fi
 EOF
-            grub-mkstandalone -O x86_64-efi \
+            if grub-mkstandalone -O x86_64-efi \
+                -d /usr/lib/grub/x86_64-efi \
                 -o "/data/httpboot/${version}/EFI/BOOT/GRUBX64_HTTP.EFI" \
                 --modules="http efinet normal linux linuxefi tftp configfile search search_label search_fs_uuid test" \
-                "boot/grub/grub.cfg=$EMBED_CFG" >/dev/null 2>&1 || echo "Warning: grub-mkstandalone failed; continuing without embedded GRUB"
-            rm -f "$EMBED_CFG" || true
-            if [ -f "/data/httpboot/${version}/EFI/BOOT/GRUBX64_HTTP.EFI" ]; then
-                chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/GRUBX64_HTTP.EFI"
-                chmod 644 "/data/httpboot/${version}/EFI/BOOT/GRUBX64_HTTP.EFI"
-                echo "✓ Built GRUBX64_HTTP.EFI for ${version}"
+                "boot/grub/grub.cfg=$EMBED_CFG" >/dev/null 2>&1; then
+                if [ -s "/data/httpboot/${version}/EFI/BOOT/GRUBX64_HTTP.EFI" ]; then
+                    chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/GRUBX64_HTTP.EFI"
+                    chmod 644 "/data/httpboot/${version}/EFI/BOOT/GRUBX64_HTTP.EFI"
+                    echo "✓ Built GRUBX64_HTTP.EFI for ${version}"
+                else
+                    echo "Warning: Built GRUBX64_HTTP.EFI for ${version} is empty/invalid; removing"
+                    rm -f "/data/httpboot/${version}/EFI/BOOT/GRUBX64_HTTP.EFI"
+                fi
+            else
+                echo "Warning: grub-mkstandalone failed; continuing without embedded GRUB for ${version}"
             fi
+            rm -f "$EMBED_CFG" || true
         else
             echo "Warning: grub-mkstandalone not available; skipping embedded GRUB build for ${version}"
         fi
@@ -1067,16 +1074,23 @@ EOF
         done
         IFS=$OLD_IFS3
 
-        grub-mkstandalone -O x86_64-efi \
+        if grub-mkstandalone -O x86_64-efi \
+            -d /usr/lib/grub/x86_64-efi \
             -o "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI" \
             --modules="http efinet normal linux linuxefi tftp configfile search search_label search_fs_uuid test" \
-            "boot/grub/grub.cfg=$EMBED_ALL" >/dev/null 2>&1 || echo "Warning: grub-mkstandalone failed; continuing without embedded GRUB menu"
-        rm -f "$EMBED_ALL" || true
-        if [ -f "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI" ]; then
-            chown www-data:www-data "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI"
-            chmod 644 "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI"
-            echo "✓ Built GRUBX64_HTTP.EFI (HTTP menu across versions)"
+            "boot/grub/grub.cfg=$EMBED_ALL" >/dev/null 2>&1; then
+            if [ -s "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI" ]; then
+                chown www-data:www-data "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI"
+                chmod 644 "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI"
+                echo "✓ Built GRUBX64_HTTP.EFI (HTTP menu across versions)"
+            else
+                echo "Warning: HTTP GRUB output invalid; removing to avoid iPXE Exec format errors"
+                rm -f "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI"
+            fi
+        else
+            echo "Warning: grub-mkstandalone failed; continuing without embedded GRUB menu"
         fi
+        rm -f "$EMBED_ALL" || true
     else
         echo "Warning: grub-mkstandalone not available; skipping embedded GRUB menu build"
     fi
@@ -1161,16 +1175,7 @@ generate_boot_menu() {
 echo Configuring network...
 dhcp || goto retry_dhcp
 
-# Prefer embedded GRUB with HTTP prelude to avoid PXE next-server issues
-set http_grub http://{{SERVER_IP}}/EFI/BOOT/GRUBX64_HTTP.EFI
-
-echo Booting GRUB (HTTP) from: ${http_grub}
-imgfree
-imgfetch --name grubx64_http.efi ${http_grub} || goto grub_http_fail
-boot grubx64_http.efi || goto grub_http_fail
-
-:grub_http_fail
-echo GRUB HTTP failed; falling back to TFTP GRUB...
+# Directly chain to TFTP GRUB for reliable proxy-mode operation
 chain tftp://{{SERVER_IP}}/EFI/BOOT/BOOTX64.EFI || goto fail
 boot || goto fail
 
