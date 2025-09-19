@@ -1304,6 +1304,7 @@ setup_global_http_grub() {
         echo "set default=0"
         echo "set timeout=${BOOT_MENU_TIMEOUT}"
         echo "set timeout_style=menu"
+        echo "terminal_output console"
         echo "insmod http"
         echo "insmod configfile"
         echo "insmod loopback"
@@ -1312,6 +1313,7 @@ setup_global_http_grub() {
         echo "insmod linux"
         echo "insmod gzio"
         echo "insmod normal"
+        echo "echo 'Global GRUB menu loaded from HTTP. Press Enter to continue if screen is blank.'"
     } > "${GLOBAL_GRUB_CFG}"
 
     OLD_IFS4=$IFS
@@ -1353,10 +1355,20 @@ EOF
 insmod http
 insmod configfile
 insmod normal
+terminal_output console
 set timeout=1
 set timeout_style=menu
-configfile (http,${SERVER_IP})/EFI/BOOT/grub.cfg
-normal
+echo 'Delegate: loading global menu from http://${SERVER_IP}/EFI/BOOT/grub.cfg'
+if configfile (http,${SERVER_IP})/EFI/BOOT/grub.cfg; then
+  echo 'Delegate: global menu loaded.'
+  normal
+else
+  echo 'Delegate: FAILED to load global menu. Listing HTTP root and version paths:'
+  ls (http,${SERVER_IP})/
+  ls (http,${SERVER_IP})/EFI/BOOT/
+  sleep 5
+  normal
+fi
 EOF
         GRUB_LOG="/data/grub-build.log"
         if [ "$LOG_LEVEL" = "debug" ]; then
