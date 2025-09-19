@@ -912,6 +912,9 @@ unset net_default_server
 # Point to the installer ISO under the version path
 loopback loop0 (http,${SERVER_IP})/${version}/installer.iso
 set root=loop0
+# Ensure GRUB can load modules from the ISO
+set prefix=($root)/boot/grub
+export prefix
 configfile ($root)/EFI/BOOT/grub.cfg
 EOF
         chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub_include.cfg"
