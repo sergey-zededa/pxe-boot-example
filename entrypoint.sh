@@ -926,7 +926,7 @@ EOF
             if grub-mkstandalone -O x86_64-efi \
                 -d /usr/lib/grub/x86_64-efi \
                 -o "/data/httpboot/${version}/EFI/BOOT/GRUBX64_HTTP.EFI" \
-                --modules="http efinet normal tftp configfile search search_label search_fs_uuid test" \
+                --modules="http efinet normal tftp configfile search search_label search_fs_uuid test linux gzio" \
                 "boot/grub/grub.cfg=$EMBED_CFG" >/dev/null 2>&1; then
                 if [ -s "/data/httpboot/${version}/EFI/BOOT/GRUBX64_HTTP.EFI" ]; then
                     chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/GRUBX64_HTTP.EFI"
@@ -960,6 +960,7 @@ EOF
         EMBED_TFTP="/tmp/grub-embedded-tftp.cfg"
         {
             echo "insmod http"
+            echo "insmod configfile"
             echo "insmod test"
             echo "set default=0"
             echo "set timeout=${BOOT_MENU_TIMEOUT}"
@@ -968,12 +969,10 @@ EOF
         OLD_IFS2=$IFS
         IFS=','
         for v in ${EVE_VERSIONS}; do
-            cat >> "$EMBED_TFTP" <<EOF
+cat >> "$EMBED_TFTP" <<EOF
 menuentry 'EVE-OS ${v}' {
-    echo 'Chainloading vendor GRUB over HTTP for ${v}...'
-    insmod chain
-    chainloader (http,${SERVER_IP})/${v}/EFI/BOOT/BOOTX64.EFI
-    boot
+    echo 'Loading vendor GRUB config over HTTP for ${v}...'
+    configfile (http,${SERVER_IP})/${v}/EFI/BOOT/grub.cfg
 }
 EOF
         done
@@ -981,7 +980,7 @@ EOF
 
         if grub-mkstandalone -O x86_64-efi \
             -o "/tftpboot/EFI/BOOT/BOOTX64.EFI" \
-            --modules="http efinet normal tftp configfile search search_label search_fs_uuid test chain" \
+            --modules="http efinet normal tftp configfile search search_label search_fs_uuid test linux gzio" \
             "boot/grub/grub.cfg=$EMBED_TFTP" >/dev/null 2>&1; then
 chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} "/tftpboot/EFI/BOOT/BOOTX64.EFI"
             chmod 644 "/tftpboot/EFI/BOOT/BOOTX64.EFI"
@@ -1019,18 +1018,17 @@ chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} "/tftpboot/EFI/BOOT/BOOTX64.EFI"
         echo "set timeout=${BOOT_MENU_TIMEOUT}"
         echo "set default=0"
         echo "insmod http"
+        echo "insmod configfile"
         echo "insmod test"
     } > "${GRUB_TFTP_CFG}"
 
     OLD_IFS2=$IFS
     IFS=','
     for v in ${EVE_VERSIONS}; do
-        cat >> "${GRUB_TFTP_CFG}" <<EOF
+cat >> "${GRUB_TFTP_CFG}" <<EOF
 menuentry 'EVE-OS ${v}' {
-    echo 'Chainloading vendor GRUB over HTTP for ${v}...'
-    insmod chain
-    chainloader (http,${SERVER_IP})/${v}/EFI/BOOT/BOOTX64.EFI
-    boot
+    echo 'Loading vendor GRUB config over HTTP for ${v}...'
+    configfile (http,${SERVER_IP})/${v}/EFI/BOOT/grub.cfg
 }
 EOF
     done
@@ -1084,7 +1082,7 @@ EOF
         if grub-mkstandalone -O x86_64-efi \
             -d /usr/lib/grub/x86_64-efi \
             -o "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI" \
-            --modules="http efinet normal tftp configfile search search_label search_fs_uuid test" \
+            --modules="http efinet normal tftp configfile search search_label search_fs_uuid test linux gzio" \
             "boot/grub/grub.cfg=$EMBED_ALL" >/dev/null 2>&1; then
             if [ -s "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI" ]; then
                 chown www-data:www-data "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI"
