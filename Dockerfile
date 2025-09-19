@@ -6,6 +6,7 @@ RUN apt-get update && \
       dnsmasq \
       nginx \
       curl \
+      ca-certificates \
       tar \
       dos2unix \
       bash \
@@ -16,6 +17,7 @@ RUN apt-get update && \
       binutils \
       grub-efi-amd64-bin \
       grub-common && \
+    update-ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 # 2. Create necessary directories with proper permissions
