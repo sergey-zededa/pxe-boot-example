@@ -933,25 +933,10 @@ EOF
         for v in ${EVE_VERSIONS}; do
             cat >> "$EMBED_TFTP" <<EOF
 menuentry 'EVE-OS ${v}' {
-    echo 'Switching to HTTP configuration for ${v}...'
-    set url=http://${SERVER_IP}/${v}/
-    export url
-    set isnetboot=true
-    export isnetboot
-    unset pxe_default_server
-    unset net_default_server
-    set cmddevice=http,${SERVER_IP}
-    set cmdpath=(http,${SERVER_IP})/${v}/
-    export cmddevice
-    export cmdpath
-    if configfile (http,${SERVER_IP})/${v}/EFI/BOOT/grub.cfg; then
-        true
-    elif configfile (http,${SERVER_IP})/${v}/EFI/BOOT/grub_include.cfg; then
-        true
-    else
-        echo 'ERROR: HTTP GRUB config not found for ${v}'
-        sleep 5
-    fi
+    echo 'Chainloading vendor GRUB over HTTP for ${v}...'
+    insmod chain
+    chainloader (http,${SERVER_IP})/${v}/EFI/BOOT/BOOTX64.EFI
+    boot
 }
 EOF
         done
@@ -1005,25 +990,10 @@ EOF
     for v in ${EVE_VERSIONS}; do
         cat >> "${GRUB_TFTP_CFG}" <<EOF
 menuentry 'EVE-OS ${v}' {
-    echo 'Switching to HTTP configuration for ${v}...'
-    set url=http://${SERVER_IP}/${v}/
-    export url
-    set isnetboot=true
-    export isnetboot
-    unset pxe_default_server
-    unset net_default_server
-    set cmddevice=http,${SERVER_IP}
-    set cmdpath=(http,${SERVER_IP})/${v}/
-    export cmddevice
-    export cmdpath
-    if configfile (http,${SERVER_IP})/${v}/EFI/BOOT/grub.cfg; then
-        true
-    elif configfile (http,${SERVER_IP})/${v}/EFI/BOOT/grub_include.cfg; then
-        true
-    else
-        echo 'ERROR: HTTP GRUB config not found for ${v}'
-        sleep 5
-    fi
+    echo 'Chainloading vendor GRUB over HTTP for ${v}...'
+    insmod chain
+    chainloader (http,${SERVER_IP})/${v}/EFI/BOOT/BOOTX64.EFI
+    boot
 }
 EOF
     done
