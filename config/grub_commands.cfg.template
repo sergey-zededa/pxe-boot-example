@@ -23,16 +23,18 @@ export isnetboot
 unset pxe_default_server
 unset net_default_server
 
-# Hand off to official EVE GRUB config over HTTP (never use ISO config here)
-if configfile (http,{{SERVER_IP}})/{{VERSION}}/EFI/BOOT/grub.cfg; then
+# Hand off to EVE GRUB configuration over HTTP.
+# Prefer our include shim (grub_include.cfg) which sets up ISO loopback,
+# then fall back to the vendor grub.cfg if include is missing.
+if configfile (http,{{SERVER_IP}})/{{VERSION}}/EFI/BOOT/grub_include.cfg; then
     true
-elif configfile (http,{{SERVER_IP}})/{{VERSION}}/EFI/BOOT/grub_include.cfg; then
+elif configfile (http,{{SERVER_IP}})/{{VERSION}}/EFI/BOOT/grub.cfg; then
     true
 else
-    echo "ERROR: Could not load official HTTP GRUB configuration"
+    echo "ERROR: Could not load HTTP GRUB configuration"
     echo "Tried:"
-    echo "  http://{{SERVER_IP}}/{{VERSION}}/EFI/BOOT/grub.cfg"
     echo "  http://{{SERVER_IP}}/{{VERSION}}/EFI/BOOT/grub_include.cfg"
+    echo "  http://{{SERVER_IP}}/{{VERSION}}/EFI/BOOT/grub.cfg"
     # As a last resort, show what HTTP can see
     ls (http,{{SERVER_IP}})/{{VERSION}}/
     sleep 5

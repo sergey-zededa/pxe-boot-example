@@ -897,6 +897,27 @@ chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} /tftpboot/ipxe.efi
         chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub_pre.cfg"
         chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub_pre.cfg"
 
+        echo "Generating GRUB include shim for ISO boot for version ${version}..."
+        cat > "/data/httpboot/${version}/EFI/BOOT/grub_include.cfg" <<EOF
+insmod http
+insmod loopback
+insmod iso9660
+insmod test
+set url=http://${SERVER_IP}/${version}/
+export url
+set isnetboot=true
+export isnetboot
+unset pxe_default_server
+unset net_default_server
+# Point to the installer ISO under the version path
+loopback loop0 (http,${SERVER_IP})/${version}/installer.iso
+set root=loop0
+configfile (
+root)/EFI/BOOT/grub.cfg
+EOF
+        chmod 644 "/data/httpboot/${version}/EFI/BOOT/grub_include.cfg"
+        chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/grub_include.cfg"
+
         # Build a standalone GRUB EFI with embedded HTTP prelude to avoid PXE next-server in proxy mode
         if command -v grub-mkstandalone >/dev/null 2>&1; then
             echo "Building embedded GRUB HTTP EFI for ${version}..."
@@ -926,7 +947,7 @@ EOF
             if grub-mkstandalone -O x86_64-efi \
                 -d /usr/lib/grub/x86_64-efi \
                 -o "/data/httpboot/${version}/EFI/BOOT/GRUBX64_HTTP.EFI" \
-                --modules="http efinet normal tftp configfile search search_label search_fs_uuid test linux gzio" \
+                --modules="http efinet normal tftp configfile search search_label search_fs_uuid test linux gzio loopback iso9660" \
                 "boot/grub/grub.cfg=$EMBED_CFG" >/dev/null 2>&1; then
                 if [ -s "/data/httpboot/${version}/EFI/BOOT/GRUBX64_HTTP.EFI" ]; then
                     chown www-data:www-data "/data/httpboot/${version}/EFI/BOOT/GRUBX64_HTTP.EFI"
@@ -971,8 +992,19 @@ EOF
         for v in ${EVE_VERSIONS}; do
 cat >> "$EMBED_TFTP" <<EOF
 menuentry 'EVE-OS ${v}' {
-    echo 'Loading vendor GRUB config over HTTP for ${v}...'
-    configfile (http,${SERVER_IP})/${v}/EFI/BOOT/grub.cfg
+    echo 'Preparing HTTP environment for ${v}...'
+    set url=http://${SERVER_IP}/${v}/
+    export url
+    set isnetboot=true
+    export isnetboot
+    unset pxe_default_server
+    unset net_default_server
+    set cmddevice=http,${SERVER_IP}
+    set cmdpath=(http,${SERVER_IP})/${v}/
+    export cmddevice
+    export cmdpath
+    echo 'Loading GRUB prelude for ${v}...'
+    configfile (http,${SERVER_IP})/${v}/EFI/BOOT/grub_pre.cfg
 }
 EOF
         done
@@ -980,7 +1012,7 @@ EOF
 
         if grub-mkstandalone -O x86_64-efi \
             -o "/tftpboot/EFI/BOOT/BOOTX64.EFI" \
-            --modules="http efinet normal tftp configfile search search_label search_fs_uuid test linux gzio" \
+            --modules="http efinet normal tftp configfile search search_label search_fs_uuid test linux gzio loopback iso9660" \
             "boot/grub/grub.cfg=$EMBED_TFTP" >/dev/null 2>&1; then
 chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} "/tftpboot/EFI/BOOT/BOOTX64.EFI"
             chmod 644 "/tftpboot/EFI/BOOT/BOOTX64.EFI"
@@ -1019,6 +1051,8 @@ chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} "/tftpboot/EFI/BOOT/BOOTX64.EFI"
         echo "set default=0"
         echo "insmod http"
         echo "insmod configfile"
+        echo "insmod loopback"
+        echo "insmod iso9660"
         echo "insmod test"
     } > "${GRUB_TFTP_CFG}"
 
@@ -1027,8 +1061,19 @@ chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} "/tftpboot/EFI/BOOT/BOOTX64.EFI"
     for v in ${EVE_VERSIONS}; do
 cat >> "${GRUB_TFTP_CFG}" <<EOF
 menuentry 'EVE-OS ${v}' {
-    echo 'Loading vendor GRUB config over HTTP for ${v}...'
-    configfile (http,${SERVER_IP})/${v}/EFI/BOOT/grub.cfg
+    echo 'Preparing HTTP environment for ${v}...'
+    set url=http://${SERVER_IP}/${v}/
+    export url
+    set isnetboot=true
+    export isnetboot
+    unset pxe_default_server
+    unset net_default_server
+    set cmddevice=http,${SERVER_IP}
+    set cmdpath=(http,${SERVER_IP})/${v}/
+    export cmddevice
+    export cmdpath
+    echo 'Loading GRUB prelude for ${v}...'
+    configfile (http,${SERVER_IP})/${v}/EFI/BOOT/grub_pre.cfg
 }
 EOF
     done
@@ -1045,6 +1090,9 @@ chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} "${GRUB_TFTP_CFG}"
         EMBED_ALL="/tmp/grub-embedded-all.cfg"
         {
             echo "insmod http"
+            echo "insmod configfile"
+            echo "insmod loopback"
+            echo "insmod iso9660"
             echo "insmod test"
             echo "set default=0"
             echo "set timeout=${BOOT_MENU_TIMEOUT}"
@@ -1053,9 +1101,9 @@ chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} "${GRUB_TFTP_CFG}"
         OLD_IFS3=$IFS
         IFS=','
         for v in ${EVE_VERSIONS}; do
-            cat >> "$EMBED_ALL" <<EOF
+cat >> "$EMBED_ALL" <<EOF
 menuentry 'EVE-OS ${v}' {
-    echo 'Switching to HTTP configuration for ${v}...'
+    echo 'Preparing HTTP environment for ${v}...'
     set url=http://${SERVER_IP}/${v}/
     export url
     set isnetboot=true
@@ -1066,9 +1114,12 @@ menuentry 'EVE-OS ${v}' {
     set cmdpath=(http,${SERVER_IP})/${v}/
     export cmddevice
     export cmdpath
-    if configfile (http,${SERVER_IP})/${v}/EFI/BOOT/grub.cfg; then
+    echo 'Loading GRUB prelude for ${v}...'
+    if configfile (http,${SERVER_IP})/${v}/EFI/BOOT/grub_include.cfg; then
         true
-    elif configfile (http,${SERVER_IP})/${v}/EFI/BOOT/grub_include.cfg; then
+    elif configfile (http,${SERVER_IP})/${v}/EFI/BOOT/grub_pre.cfg; then
+        true
+    elif configfile (http,${SERVER_IP})/${v}/EFI/BOOT/grub.cfg; then
         true
     else
         echo 'ERROR: HTTP GRUB config not found for ${v}'
