@@ -38,5 +38,5 @@ RUN dos2unix /entrypoint.sh && \
 EXPOSE 80 69/udp 67/udp
 VOLUME /data
 
-# 5. Set entrypoint
-ENTRYPOINT ["/entrypoint.sh"]
+# 5. Set entrypoint (force bash to avoid /bin/sh running the script)
+ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
