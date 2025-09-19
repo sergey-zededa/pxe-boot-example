@@ -1253,9 +1253,16 @@ check_file() {
         exit 1
     fi
 
-    if ! su -s /bin/sh www-data -c "test -r \"$file\""; then
-        echo "ERROR: www-data cannot read: $file"
-        exit 1
+    if command -v runuser >/dev/null 2>&1; then
+        if ! runuser -u www-data -- test -r "$file"; then
+            echo "ERROR: www-data cannot read: $file"
+            exit 1
+        fi
+    else
+        if ! su -s /bin/sh www-data -c "test -r \"$file\""; then
+            echo "ERROR: www-data cannot read: $file"
+            exit 1
+        fi
     fi
 }
 
