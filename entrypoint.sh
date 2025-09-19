@@ -287,7 +287,7 @@ generate_autoexec() {
         "/tftpboot/autoexec.ipxe" \
         "SERVER_IP=${SERVER_IP}"
     chmod 644 /tftpboot/autoexec.ipxe
-    chown dnsmasq:dnsmasq /tftpboot/autoexec.ipxe
+chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} /tftpboot/autoexec.ipxe
 }
 
 # Function to generate nginx configuration (production defaults)
@@ -434,7 +434,7 @@ setup_directories() {
     find /data/httpboot -type d -exec chmod 755 {} \;
     find /data/httpboot -type f -exec chmod 644 {} \;
     
-    chown -R dnsmasq:dnsmasq /tftpboot  
+chown -R ${DNSMASQ_USER}:${DNSMASQ_GROUP} /tftpboot
     find /tftpboot -type d -exec chmod 755 {} \;
     find /tftpboot -type f -exec chmod 644 {} \;
     
@@ -757,7 +757,7 @@ fi
             if [ -f "/data/httpboot/${DEFAULT_VERSION}/ipxe.efi" ]; then
                 echo "Setting up UEFI TFTP boot file..."
                 cp "/data/httpboot/${DEFAULT_VERSION}/ipxe.efi" /tftpboot/ipxe.efi
-                chown dnsmasq:dnsmasq /tftpboot/ipxe.efi
+chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} /tftpboot/ipxe.efi
                 chmod 644 /tftpboot/ipxe.efi
             else
                 echo "Warning: ipxe.efi not found in version ${DEFAULT_VERSION}"
@@ -950,7 +950,8 @@ EOF
             -o "/tftpboot/EFI/BOOT/BOOTX64.EFI" \
             --modules="http efinet normal linux linuxefi tftp configfile search search_label search_fs_uuid test" \
             "boot/grub/grub.cfg=$EMBED_TFTP" >/dev/null 2>&1; then
-            chown dnsmasq:dnsmasq "/tftpboot/EFI/BOOT/BOOTX64.EFI"
+chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} "/tftpboot/EFI/BOOT/BOOTX64.EFI"
+"
             chmod 644 "/tftpboot/EFI/BOOT/BOOTX64.EFI"
             echo "✓ Embedded TFTP GRUB built successfully"
         else
@@ -1003,7 +1004,7 @@ EOF
     done
     IFS=$OLD_IFS2
 
-    chown dnsmasq:dnsmasq "${GRUB_TFTP_CFG}"
+chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} "${GRUB_TFTP_CFG}"
     chmod 644 "${GRUB_TFTP_CFG}"
     echo "✓ TFTP GRUB bootstrap menu generated"
 
@@ -1107,7 +1108,7 @@ set_file_permissions() {
 
         # TFTP files
         echo "Setting TFTP file permissions..."
-        find /tftpboot -type f -exec chown dnsmasq:dnsmasq {} \;
+find /tftpboot -type f -exec chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} {} \;
         find /tftpboot -type f -exec chmod 644 {} \;
 
         # Latest directory
@@ -1135,7 +1136,24 @@ echo "Starting EVE-OS iPXE Server..."
 # 1. Validate environment
 validate_environment
 
-# 2. Set up EVE-OS versions and assets
+# 2. Resolve dnsmasq ownership and set up EVE-OS versions and assets
+# Determine a safe owner:group for TFTP files in Debian-based image
+DNSMASQ_USER=${DNSMASQ_USER:-dnsmasq}
+if ! id -u "$DNSMASQ_USER" >/dev/null 2>&1; then
+    DNSMASQ_USER=nobody
+fi
+DNSMASQ_GROUP=${DNSMASQ_GROUP:-dnsmasq}
+if command -v getent >/dev/null 2>&1; then
+    if ! getent group "$DNSMASQ_GROUP" >/dev/null 2>&1; then
+        if getent group nogroup >/dev/null 2>&1; then DNSMASQ_GROUP=nogroup; else DNSMASQ_GROUP=$DNSMASQ_USER; fi
+    fi
+else
+    if ! grep -q "^${DNSMASQ_GROUP}:" /etc/group 2>/dev/null; then
+        if grep -q "^nogroup:" /etc/group 2>/dev/null; then DNSMASQ_GROUP=nogroup; else DNSMASQ_GROUP=$DNSMASQ_USER; fi
+    fi
+fi
+echo "Using dnsmasq file owner: ${DNSMASQ_USER}:${DNSMASQ_GROUP}"
+
 setup_eve_versions
 
 # Function to generate minimal iPXE stub (no menu)
