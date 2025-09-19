@@ -1191,6 +1191,14 @@ set_file_permissions() {
 find /tftpboot -type f -exec chown ${DNSMASQ_USER}:${DNSMASQ_GROUP} {} \;
         find /tftpboot -type f -exec chmod 644 {} \;
 
+        # Global HTTP GRUB files
+        if [ -d "/data/httpboot/EFI/BOOT" ]; then
+            echo "Setting global HTTP GRUB permissions..."
+            chown -R www-data:www-data "/data/httpboot/EFI/BOOT"
+            find "/data/httpboot/EFI/BOOT" -type d -exec chmod 755 {} \;
+            find "/data/httpboot/EFI/BOOT" -type f -exec chmod 644 {} \;
+        fi
+
         # Latest directory
         if [ -d "/data/httpboot/latest" ]; then
             echo "Setting latest directory permissions..."
@@ -1247,8 +1255,8 @@ generate_boot_menu() {
 echo Configuring network...
 dhcp || goto retry_dhcp
 
-# Directly chain to TFTP GRUB for reliable proxy-mode operation
-chain tftp://{{SERVER_IP}}/EFI/BOOT/BOOTX64.EFI || goto fail
+# Prefer HTTP for the first-stage vendor GRUB; fallback to TFTP if HTTP fails
+chain http://{{SERVER_IP}}/EFI/BOOT/BOOTX64.EFI || chain tftp://{{SERVER_IP}}/EFI/BOOT/BOOTX64.EFI || goto fail
 boot || goto fail
 
 :fail
@@ -1271,6 +1279,65 @@ generate_boot_menu
 generate_nginx_conf
 generate_autoexec
 generate_dnsmasq_conf
+
+# 4a. Set up global HTTP vendor GRUB (fast first-stage over HTTP)
+setup_global_http_grub() {
+    echo "Setting up global HTTP vendor GRUB..."
+    mkdir -p /data/httpboot/EFI/BOOT
+
+    # Copy vendor BOOTX64.EFI from the default version to the global HTTP path
+    if [ -n "${DEFAULT_VERSION}" ] && [ -f "/data/httpboot/${DEFAULT_VERSION}/EFI/BOOT/BOOTX64.EFI" ]; then
+        cp "/data/httpboot/${DEFAULT_VERSION}/EFI/BOOT/BOOTX64.EFI" "/data/httpboot/EFI/BOOT/BOOTX64.EFI"
+        chown www-data:www-data "/data/httpboot/EFI/BOOT/BOOTX64.EFI"
+        chmod 644 "/data/httpboot/EFI/BOOT/BOOTX64.EFI"
+    else
+        echo "WARNING: Cannot set global BOOTX64.EFI (missing DEFAULT_VERSION or file). HTTP first-stage may fail."
+    fi
+
+    # Generate global GRUB menu that delegates to per-version HTTP preludes
+    GLOBAL_GRUB_CFG="/data/httpboot/EFI/BOOT/grub.cfg"
+    echo "Generating global GRUB menu at ${GLOBAL_GRUB_CFG}..."
+    {
+        echo "set default=0"
+        echo "set timeout=${BOOT_MENU_TIMEOUT}"
+        echo "insmod http"
+        echo "insmod configfile"
+        echo "insmod loopback"
+        echo "insmod iso9660"
+        echo "insmod test"
+        echo "insmod linux"
+        echo "insmod gzio"
+    } > "${GLOBAL_GRUB_CFG}"
+
+    OLD_IFS4=$IFS
+    IFS=','
+    for v in ${EVE_VERSIONS}; do
+        cat >> "${GLOBAL_GRUB_CFG}" <<EOF
+menuentry 'EVE-OS ${v}' {
+    echo 'Preparing HTTP environment for ${v}...'
+    set url=http://${SERVER_IP}/${v}/
+    export url
+    set isnetboot=true
+    export isnetboot
+    unset pxe_default_server
+    unset net_default_server
+    set cmddevice=http,${SERVER_IP}
+    set cmdpath=(http,${SERVER_IP})/${v}/
+    export cmddevice
+    export cmdpath
+    echo 'Loading prelude for ${v}...'
+    configfile (http,${SERVER_IP})/${v}/EFI/BOOT/grub_pre.cfg
+}
+EOF
+    done
+    IFS=$OLD_IFS4
+
+    chown www-data:www-data "${GLOBAL_GRUB_CFG}"
+    chmod 644 "${GLOBAL_GRUB_CFG}"
+    echo "✓ Global HTTP vendor GRUB configured"
+}
+
+setup_global_http_grub
 
 # 5. Download bootloaders
 echo "Checking bootloaders..."
@@ -1318,7 +1385,9 @@ check_file "/data/httpboot/boot.ipxe"
 
 # Ensure we have at least one GRUB path available
 if [ -f "/data/httpboot/EFI/BOOT/GRUBX64_HTTP.EFI" ]; then
-    echo "✓ HTTP GRUB image present"
+    echo "✓ HTTP GRUB image present (embedded)"
+elif [ -f "/data/httpboot/EFI/BOOT/BOOTX64.EFI" ] && [ -f "/data/httpboot/EFI/BOOT/grub.cfg" ]; then
+    echo "✓ Global HTTP vendor GRUB present"
 else
     echo "HTTP GRUB image not found; verifying TFTP fallback..."
     if [ ! -f "/tftpboot/EFI/BOOT/BOOTX64.EFI" ] || [ ! -f "/tftpboot/EFI/BOOT/grub.cfg" ]; then
